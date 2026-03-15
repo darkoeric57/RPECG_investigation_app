@@ -93,6 +93,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
                     Expanded(
                       child: TextField(
                         controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                         decoration: InputDecoration(
                           hintText: 'e.g., Industrial HVAC Unit',

@@ -6,22 +6,26 @@ class LoadDetailsState {
   final ApplianceCategory selectedCategory;
   final Map<String, int> selections; // Appliance ID -> Quantity
   final List<CustomLoad> customSelections;
+  final Map<String, String> selectedVariants; // Appliance ID -> Variant Name
 
   LoadDetailsState({
     this.selectedCategory = ApplianceCategory.residential,
     this.selections = const {},
     this.customSelections = const [],
+    this.selectedVariants = const {},
   });
 
   LoadDetailsState copyWith({
     ApplianceCategory? selectedCategory,
     Map<String, int>? selections,
     List<CustomLoad>? customSelections,
+    Map<String, String>? selectedVariants,
   }) {
     return LoadDetailsState(
       selectedCategory: selectedCategory ?? this.selectedCategory,
       selections: selections ?? this.selections,
       customSelections: customSelections ?? this.customSelections,
+      selectedVariants: selectedVariants ?? this.selectedVariants,
     );
   }
 }
@@ -56,10 +60,31 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
 
   void incrementAppliance(String id) {
     final currentQty = state.selections[id] ?? 0;
+    
+    // If first time adding, and it has variants, pick the first one
+    Map<String, String> newVariants = Map.from(state.selectedVariants);
+    if (currentQty == 0) {
+      final allApps = ref.read(appliancesProvider);
+      final appliance = allApps.firstWhere((a) => a.id == id);
+      if (appliance.variants != null && appliance.variants!.isNotEmpty) {
+        newVariants[id] = appliance.variants!.keys.first;
+      }
+    }
+
     state = state.copyWith(
       selections: {
         ...state.selections,
         id: currentQty + 1,
+      },
+      selectedVariants: newVariants,
+    );
+  }
+
+  void setApplianceVariant(String id, String variant) {
+    state = state.copyWith(
+      selectedVariants: {
+        ...state.selectedVariants,
+        id: variant,
       },
     );
   }
@@ -119,7 +144,15 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
     int total = 0;
     state.selections.forEach((id, qty) {
       final appliance = allAppliances.firstWhere((a) => a.id == id);
-      total += appliance.averageWattage * qty;
+      
+      // Check if a variant is selected and has wattage
+      int wattage = appliance.averageWattage;
+      final selectedVariant = state.selectedVariants[id];
+      if (selectedVariant != null && appliance.variants != null) {
+        wattage = appliance.variants![selectedVariant] ?? wattage;
+      }
+      
+      total += wattage * qty;
     });
     for (var custom in state.customSelections) {
       total += custom.wattage * custom.quantity;
@@ -137,11 +170,16 @@ final appliancesProvider = Provider<List<Appliance>>((ref) {
     const Appliance(
       id: 'res_ac',
       name: 'Air Conditioner',
-      wattageDisplay: '1,200W - 1,500W',
-      averageWattage: 1350,
+      wattageDisplay: '1,200W - 2,800W',
+      averageWattage: 1200,
       category: ApplianceCategory.residential,
       icon: Icons.ac_unit,
       isHeavyLoad: true,
+      variants: {
+        '1.5 HP': 1200,
+        '2.5 HP': 2000,
+        '3.5 HP': 2800,
+      },
     ),
     const Appliance(
       id: 'res_fridge',
@@ -185,11 +223,11 @@ final appliancesProvider = Provider<List<Appliance>>((ref) {
     ),
     const Appliance(
       id: 'res_fan',
-      name: 'Toys Fan',
+      name: 'Fan',
       wattageDisplay: '65W - 100W',
       averageWattage: 80,
       category: ApplianceCategory.residential,
-      icon: Icons.toys,
+      icon: Icons.mode_fan_off,
     ),
     const Appliance(
       id: 'res_kettle',
@@ -198,6 +236,22 @@ final appliancesProvider = Provider<List<Appliance>>((ref) {
       averageWattage: 2500,
       category: ApplianceCategory.residential,
       icon: Icons.bolt,
+    ),
+    const Appliance(
+      id: 'res_freezer',
+      name: 'Chest Freezer',
+      wattageDisplay: '200W - 350W',
+      averageWattage: 275,
+      category: ApplianceCategory.residential,
+      icon: Icons.kitchen_outlined,
+    ),
+    const Appliance(
+      id: 'res_led',
+      name: 'LED Bulb (Single)',
+      wattageDisplay: '7W - 15W',
+      averageWattage: 11,
+      category: ApplianceCategory.residential,
+      icon: Icons.lightbulb_outline,
     ),
     const Appliance(
       id: 'res_charger',

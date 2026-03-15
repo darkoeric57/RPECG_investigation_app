@@ -238,8 +238,9 @@ class DashboardHome extends ConsumerWidget {
         ],
       ),
       child: TextField(
+        textCapitalization: TextCapitalization.words,
         decoration: InputDecoration(
-          hintText: 'Search records, investigators...',
+          hintText: 'Search meters or customers...',
           prefixIcon: const Icon(Icons.search),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,

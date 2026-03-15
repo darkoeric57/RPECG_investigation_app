@@ -80,8 +80,9 @@ class _MeterMapViewState extends State<MeterMapView> {
         ],
       ),
       child: TextField(
+        textCapitalization: TextCapitalization.words,
         decoration: InputDecoration(
-          hintText: 'Search location or meter ID',
+          hintText: 'Search locations or meter ID',
           prefixIcon: const Icon(Icons.search, color: AppTheme.primary),
           suffixIcon: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),

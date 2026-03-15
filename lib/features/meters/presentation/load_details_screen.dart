@@ -148,7 +148,8 @@ class LoadDetailsScreen extends ConsumerWidget {
           (context, index) {
             final item = flagshipItems[index];
             final qty = state.selections[item.id] ?? 0;
-            return _buildApplianceCard(item, qty, notifier);
+            final selectedVariant = state.selectedVariants[item.id];
+            return _buildApplianceCard(item, qty, selectedVariant, notifier);
           },
           childCount: flagshipItems.length,
         ),
@@ -156,19 +157,22 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildApplianceCard(Appliance item, int qty, LoadDetailsNotifier notifier) {
+  Widget _buildApplianceCard(Appliance item, int qty, String? selectedVariant, LoadDetailsNotifier notifier) {
     final isSelected = qty > 0;
     
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
       padding: const EdgeInsets.all(16),
+      height: isSelected && item.variants != null ? 220 : 180, // Dynamic height for variants
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: isSelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
+            color: isSelected ? AppTheme.primary.withOpacity(0.08) : Colors.black.withOpacity(0.03),
+            blurRadius: isSelected ? 20 : 10,
             offset: const Offset(0, 4),
           )
         ],
@@ -200,14 +204,65 @@ class LoadDetailsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            item.wattageDisplay,
-            style: TextStyle(fontSize: 10, color: AppTheme.textLight.withOpacity(0.7), fontWeight: FontWeight.bold),
+            item.variants != null && selectedVariant != null 
+                ? '${item.variants![selectedVariant]} Watts ($selectedVariant)'
+                : item.wattageDisplay,
+            style: TextStyle(
+              fontSize: 10, 
+              color: isSelected ? AppTheme.primary : AppTheme.textLight.withOpacity(0.7), 
+              fontWeight: FontWeight.bold
+            ),
           ),
-          if (item.isHeavyLoad) ...[
+          if (isSelected && item.variants != null) ...[
+            const SizedBox(height: 16),
+            _buildVariantSelector(item, selectedVariant!, notifier),
+          ],
+          if (item.isHeavyLoad && (item.variants == null || !isSelected)) ...[
             const SizedBox(height: 12),
             _buildLoadIndicator(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildVariantSelector(Appliance item, String selected, LoadDetailsNotifier notifier) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundLight,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Row(
+        children: item.variants!.keys.map((variant) {
+          final isSelected = variant == selected;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => notifier.setApplianceVariant(item.id, variant),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected ? [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  ] : null,
+                ),
+                child: Center(
+                  child: Text(
+                    variant,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
+                      color: isSelected ? AppTheme.primary : AppTheme.textLight,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -356,49 +411,76 @@ class LoadDetailsScreen extends ConsumerWidget {
     if (others.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
     return SliverPadding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final item = others[index];
+        delegate: SliverChildListDelegate([
+          const Padding(
+            padding: EdgeInsets.only(top: 16, bottom: 16),
+            child: Text(
+              'PREDEFINED LOADS',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textLight,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          ...others.map((item) {
             final qty = state.selections[item.id] ?? 0;
-            return _buildOtherItemCard(item, qty, notifier);
-          },
-          childCount: others.length,
-        ),
+            final selectedVariant = state.selectedVariants[item.id];
+            return _buildOtherItemCard(item, qty, selectedVariant, notifier);
+          }),
+        ]),
       ),
     );
   }
 
-  Widget _buildOtherItemCard(Appliance item, int qty, LoadDetailsNotifier notifier) {
-    return Container(
+  Widget _buildOtherItemCard(Appliance item, int qty, String? selectedVariant, LoadDetailsNotifier notifier) {
+    final isSelected = qty > 0;
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: isSelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(item.icon, color: AppTheme.textLight, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark)),
-                Text(item.wattageDisplay, style: const TextStyle(fontSize: 10, color: AppTheme.textLight)),
-              ],
-            ),
+          Row(
+            children: [
+              Icon(item.icon, color: isSelected ? AppTheme.primary : AppTheme.textLight, size: 24),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark)),
+                    Text(
+                      item.variants != null && selectedVariant != null 
+                        ? '${item.variants![selectedVariant]} Watts ($selectedVariant)'
+                        : item.wattageDisplay, 
+                      style: TextStyle(fontSize: 10, color: isSelected ? AppTheme.primary : AppTheme.textLight)
+                    ),
+                  ],
+                ),
+              ),
+              if (qty > 0)
+                _buildQuantityPicker(item.id, qty, notifier)
+              else
+                IconButton(
+                  onPressed: () => notifier.incrementAppliance(item.id),
+                  icon: const Icon(Icons.add_circle, color: AppTheme.primary),
+                ),
+            ],
           ),
-          if (qty > 0)
-            _buildQuantityPicker(item.id, qty, notifier)
-          else
-            IconButton(
-              onPressed: () => notifier.incrementAppliance(item.id),
-              icon: const Icon(Icons.add_circle, color: AppTheme.primary),
-            ),
+          if (isSelected && item.variants != null) ...[
+            const SizedBox(height: 16),
+            _buildVariantSelector(item, selectedVariant!, notifier),
+          ],
         ],
       ),
     );
@@ -408,11 +490,24 @@ class LoadDetailsScreen extends ConsumerWidget {
     if (state.customSelections.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final item = state.customSelections[index];
+        delegate: SliverChildListDelegate([
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: Text(
+              'CUSTOM LOADS',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textLight,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          ...state.customSelections.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
@@ -438,9 +533,8 @@ class LoadDetailsScreen extends ConsumerWidget {
                 ],
               ),
             );
-          },
-          childCount: state.customSelections.length,
-        ),
+          }),
+        ]),
       ),
     );
   }

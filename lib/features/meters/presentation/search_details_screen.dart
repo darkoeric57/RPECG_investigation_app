@@ -45,6 +45,7 @@ class SearchDetailsScreen extends ConsumerWidget {
                   ),
                   child: TextField(
                     onChanged: filterNotifier.updateQuery,
+                    textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
                       hintText: 'Enter Phone, Meter ID or Geocode',
                       prefixIcon: Icon(Icons.search, size: 20),

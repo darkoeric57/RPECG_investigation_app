@@ -10,6 +10,7 @@ class Appliance {
   final ApplianceCategory category;
   final IconData icon;
   final bool isHeavyLoad;
+  final Map<String, int>? variants;
 
   const Appliance({
     required this.id,
@@ -19,6 +20,7 @@ class Appliance {
     required this.category,
     required this.icon,
     this.isHeavyLoad = false,
+    this.variants,
   });
 }
 

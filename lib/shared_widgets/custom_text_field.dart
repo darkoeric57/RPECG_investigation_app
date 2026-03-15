@@ -14,6 +14,7 @@ class CustomTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String? initialValue;
   final bool isLoading;
+  final TextCapitalization textCapitalization;
 
   const CustomTextField({
     super.key,
@@ -29,6 +30,7 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
     this.initialValue,
     this.isLoading = false,
+    this.textCapitalization = TextCapitalization.words,
   });
 
   @override
@@ -53,6 +55,7 @@ class CustomTextField extends StatelessWidget {
           initialValue: initialValue,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           validator: validator,
           onChanged: onChanged,
           style: const TextStyle(
