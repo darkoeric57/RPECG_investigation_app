@@ -97,7 +97,7 @@ class LoadSummaryScreen extends ConsumerWidget {
   }
 
   Widget _buildCategoryHeader(BuildContext context, LoadDetailsState state) {
-    final itemCount = state.selections.length + state.customSelections.length;
+    final itemCount = state.applianceSelections.length + state.customSelections.length;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
       sliver: SliverToBoxAdapter(
@@ -135,10 +135,19 @@ class LoadSummaryScreen extends ConsumerWidget {
     final selectedItems = <Widget>[];
 
     // Standard Appliances
-    state.selections.forEach((id, qty) {
-      final appliance = allAppliances.firstWhere((a) => a.id == id);
-      selectedItems.add(_buildApplianceCard(appliance.name, appliance.icon, qty, appliance.averageWattage * qty));
-    });
+    for (var selection in state.applianceSelections) {
+      final appliance = allAppliances.firstWhere((a) => a.id == selection.applianceId);
+      int wattage = appliance.averageWattage;
+      if (selection.variant != null && appliance.variants != null) {
+        wattage = appliance.variants![selection.variant] ?? wattage;
+      }
+      
+      final displayName = selection.variant != null 
+          ? '${appliance.name} (${selection.variant})' 
+          : appliance.name;
+      
+      selectedItems.add(_buildApplianceCard(displayName, appliance.icon, selection.quantity, wattage * selection.quantity));
+    }
 
     // Custom Loads
     for (var custom in state.customSelections) {
@@ -156,9 +165,6 @@ class LoadSummaryScreen extends ConsumerWidget {
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-             // Handle asymmetric width for the last item if it's odd? 
-             // The HTML spans 2 columns for the 3rd item.
-             // We'll just simple grid for now or use a custom sliver list/grid mix.
              return selectedItems[index];
           },
           childCount: selectedItems.length,
@@ -201,7 +207,9 @@ class LoadSummaryScreen extends ConsumerWidget {
           const Spacer(),
           Text(
             name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
           ),
           const SizedBox(height: 8),
           Row(
@@ -209,8 +217,8 @@ class LoadSummaryScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'Quantity: x$qty',
-                style: const TextStyle(fontSize: 10, color: AppTheme.textLight, fontWeight: FontWeight.w600),
+                'Qty: x$qty',
+                style: const TextStyle(fontSize: 9, color: AppTheme.textLight, fontWeight: FontWeight.w600),
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -218,9 +226,9 @@ class LoadSummaryScreen extends ConsumerWidget {
                 children: [
                   Text(
                     _formatNumber(watts),
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppTheme.primary),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.primary),
                   ),
-                  const Text('W', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 10, color: AppTheme.primary)),
+                  const Text('W', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 9, color: AppTheme.primary)),
                 ],
               ),
             ],
@@ -231,16 +239,19 @@ class LoadSummaryScreen extends ConsumerWidget {
   }
 
   Widget _buildDistributionChart(BuildContext context, LoadDetailsState state, List<Appliance> allAppliances) {
-    // ... (rest of the logic remains the same)
-    // HVAC, Appliances, Lighting, Others
     double hvac = 0;
     double appliances = 0;
     double lighting = 0;
     double others = 0;
 
-    state.selections.forEach((id, qty) {
-      final app = allAppliances.firstWhere((a) => a.id == id);
-      final value = app.averageWattage * qty;
+    for (var selection in state.applianceSelections) {
+      final app = allAppliances.firstWhere((a) => a.id == selection.applianceId);
+      int wattage = app.averageWattage;
+      if (selection.variant != null && app.variants != null) {
+        wattage = app.variants![selection.variant] ?? wattage;
+      }
+      final value = wattage * selection.quantity;
+      
       if (app.name.toLowerCase().contains('ac') || app.name.toLowerCase().contains('heater')) {
         hvac += value;
       } else if (app.name.toLowerCase().contains('light')) {
@@ -248,7 +259,7 @@ class LoadSummaryScreen extends ConsumerWidget {
       } else {
         appliances += value;
       }
-    });
+    }
 
     for (var custom in state.customSelections) {
       others += custom.wattage * custom.quantity;

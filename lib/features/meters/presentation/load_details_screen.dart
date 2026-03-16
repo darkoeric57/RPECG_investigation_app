@@ -142,14 +142,14 @@ class LoadDetailsScreen extends ConsumerWidget {
           crossAxisCount: 2,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 0.9,
+          childAspectRatio: 0.75, // Provide more vertical room
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             final item = flagshipItems[index];
-            final qty = state.selections[item.id] ?? 0;
-            final selectedVariant = state.selectedVariants[item.id];
-            return _buildApplianceCard(item, qty, selectedVariant, notifier);
+            final selections = state.applianceSelections.where((s) => s.applianceId == item.id).toList();
+            final activeVariant = state.activeVariants[item.id] ?? (item.variants?.keys.first);
+            return _buildApplianceCard(item, selections, activeVariant, notifier);
           },
           childCount: flagshipItems.length,
         ),
@@ -157,76 +157,106 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildApplianceCard(Appliance item, int qty, String? selectedVariant, LoadDetailsNotifier notifier) {
-    final isSelected = qty > 0;
+  Widget _buildApplianceCard(Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
+    final isAnySelected = selections.isNotEmpty;
+    final totalQty = selections.fold<int>(0, (sum, s) => sum + s.quantity);
     
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      padding: const EdgeInsets.all(16),
-      height: isSelected && item.variants != null ? 220 : 180, // Dynamic height for variants
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isSelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
+        border: Border.all(color: isAnySelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
         boxShadow: [
           BoxShadow(
-            color: isSelected ? AppTheme.primary.withOpacity(0.08) : Colors.black.withOpacity(0.03),
-            blurRadius: isSelected ? 20 : 10,
+            color: isAnySelected ? AppTheme.primary.withOpacity(0.08) : Colors.black.withOpacity(0.03),
+            blurRadius: isAnySelected ? 20 : 10,
             offset: const Offset(0, 4),
           )
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (item.isHeavyLoad ? AppTheme.primary : AppTheme.secondary).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(item.icon, color: item.isHeavyLoad ? AppTheme.primary : AppTheme.textDark, size: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (item.isHeavyLoad ? AppTheme.primary : AppTheme.secondary).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.icon, color: item.isHeavyLoad ? AppTheme.primary : AppTheme.textDark, size: 24),
+                  ),
+                  if (item.variants == null)
+                    (isAnySelected 
+                       ? _buildQuantityPicker(item.id, null, totalQty, notifier)
+                       : _buildAddButton(item.id, null, notifier))
+                  else
+                    _buildAddButton(item.id, activeVariant, notifier),
+                ],
               ),
-              if (isSelected)
-                _buildQuantityPicker(item.id, qty, notifier)
-              else
-                _buildAddButton(item.id, notifier),
+              const SizedBox(height: 16),
+              Text(
+                item.name,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppTheme.textDark),
+              ),
+              const SizedBox(height: 4),
+              if (item.variants != null) ...[
+                Text(
+                  'Select Variant:',
+                  style: TextStyle(fontSize: 9, color: AppTheme.textLight.withOpacity(0.7), fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                _buildVariantSelector(item, activeVariant!, notifier),
+                if (isAnySelected) ...[
+                  const SizedBox(height: 12),
+                  ...selections.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${s.variant}:', 
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        _buildQuantityPicker(item.id, s.variant, s.quantity, notifier),
+                      ],
+                    ),
+                  )),
+                ],
+              ] else ...[
+                Text(
+                  item.wattageDisplay,
+                  style: TextStyle(
+                    fontSize: 10, 
+                    color: isAnySelected ? AppTheme.primary : AppTheme.textLight.withOpacity(0.7), 
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+              ],
+              if (item.isHeavyLoad && item.variants == null) ...[
+                const SizedBox(height: 12),
+                _buildLoadIndicator(),
+              ],
             ],
           ),
-          const Spacer(),
-          Text(
-            item.name,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppTheme.textDark),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            item.variants != null && selectedVariant != null 
-                ? '${item.variants![selectedVariant]} Watts ($selectedVariant)'
-                : item.wattageDisplay,
-            style: TextStyle(
-              fontSize: 10, 
-              color: isSelected ? AppTheme.primary : AppTheme.textLight.withOpacity(0.7), 
-              fontWeight: FontWeight.bold
-            ),
-          ),
-          if (isSelected && item.variants != null) ...[
-            const SizedBox(height: 16),
-            _buildVariantSelector(item, selectedVariant!, notifier),
-          ],
-          if (item.isHeavyLoad && (item.variants == null || !isSelected)) ...[
-            const SizedBox(height: 12),
-            _buildLoadIndicator(),
-          ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildVariantSelector(Appliance item, String selected, LoadDetailsNotifier notifier) {
+  Widget _buildVariantSelector(Appliance item, String active, LoadDetailsNotifier notifier) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -235,7 +265,7 @@ class LoadDetailsScreen extends ConsumerWidget {
       ),
       child: Row(
         children: item.variants!.keys.map((variant) {
-          final isSelected = variant == selected;
+          final isSelected = variant == active;
           return Expanded(
             child: GestureDetector(
               onTap: () => notifier.setApplianceVariant(item.id, variant),
@@ -253,7 +283,7 @@ class LoadDetailsScreen extends ConsumerWidget {
                   child: Text(
                     variant,
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 8,
                       fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
                       color: isSelected ? AppTheme.primary : AppTheme.textLight,
                     ),
@@ -267,12 +297,11 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-
-  Widget _buildQuantityPicker(String id, int qty, LoadDetailsNotifier notifier) {
+  Widget _buildQuantityPicker(String id, String? variant, int qty, LoadDetailsNotifier notifier) {
     return _buildGenericQuantityPicker(
       qty: qty,
-      onDecrement: () => notifier.decrementAppliance(id),
-      onIncrement: () => notifier.incrementAppliance(id),
+      onDecrement: () => notifier.decrementAppliance(id, variant: variant),
+      onIncrement: () => notifier.incrementAppliance(id, variant: variant),
     );
   }
 
@@ -301,21 +330,21 @@ class LoadDetailsScreen extends ConsumerWidget {
           GestureDetector(
             onTap: onDecrement,
             child: const CircleAvatar(
-              radius: 12,
+              radius: 10,
               backgroundColor: Colors.white,
-              child: Icon(Icons.remove, size: 14, color: AppTheme.textDark),
+              child: Icon(Icons.remove, size: 12, color: AppTheme.textDark),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text('$qty', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text('$qty', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
           ),
           GestureDetector(
             onTap: onIncrement,
             child: const CircleAvatar(
-              radius: 12,
+              radius: 10,
               backgroundColor: AppTheme.primary,
-              child: Icon(Icons.add, size: 14, color: Colors.white),
+              child: Icon(Icons.add, size: 12, color: Colors.white),
             ),
           ),
         ],
@@ -323,11 +352,11 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAddButton(String id, LoadDetailsNotifier notifier) {
+  Widget _buildAddButton(String id, String? variant, LoadDetailsNotifier notifier) {
     return GestureDetector(
-      onTap: () => notifier.incrementAppliance(id),
+      onTap: () => notifier.incrementAppliance(id, variant: variant),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: AppTheme.backgroundLight,
           borderRadius: BorderRadius.circular(15),
@@ -427,18 +456,19 @@ class LoadDetailsScreen extends ConsumerWidget {
             ),
           ),
           ...others.map((item) {
-            final qty = state.selections[item.id] ?? 0;
-            final selectedVariant = state.selectedVariants[item.id];
-            return _buildOtherItemCard(item, qty, selectedVariant, notifier);
+            final selections = state.applianceSelections.where((s) => s.applianceId == item.id).toList();
+            final activeVariant = state.activeVariants[item.id] ?? (item.variants?.keys.first);
+            return _buildOtherItemCard(item, selections, activeVariant, notifier);
           }),
         ]),
       ),
     );
   }
 
-  Widget _buildOtherItemCard(Appliance item, int qty, String? selectedVariant, LoadDetailsNotifier notifier) {
-    final isSelected = qty > 0;
-    
+  Widget _buildOtherItemCard(Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
+    final isAnySelected = selections.isNotEmpty;
+    final totalQty = selections.fold<int>(0, (sum, s) => sum + s.quantity);
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.only(bottom: 12),
@@ -446,40 +476,50 @@ class LoadDetailsScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isSelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
+        border: Border.all(color: isAnySelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(item.icon, color: isSelected ? AppTheme.primary : AppTheme.textLight, size: 24),
+              Icon(item.icon, color: isAnySelected ? AppTheme.primary : AppTheme.textLight, size: 24),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark)),
-                    Text(
-                      item.variants != null && selectedVariant != null 
-                        ? '${item.variants![selectedVariant]} Watts ($selectedVariant)'
-                        : item.wattageDisplay, 
-                      style: TextStyle(fontSize: 10, color: isSelected ? AppTheme.primary : AppTheme.textLight)
-                    ),
+                    if (item.variants == null)
+                      Text(item.wattageDisplay, style: TextStyle(fontSize: 10, color: isAnySelected ? AppTheme.primary : AppTheme.textLight))
+                    else
+                      Text('Multiple variants supported', style: TextStyle(fontSize: 10, color: isAnySelected ? AppTheme.primary : AppTheme.textLight)),
                   ],
                 ),
               ),
-              if (qty > 0)
-                _buildQuantityPicker(item.id, qty, notifier)
+              if (item.variants == null)
+                (isAnySelected 
+                  ? _buildQuantityPicker(item.id, null, totalQty, notifier)
+                  : IconButton(
+                      onPressed: () => notifier.incrementAppliance(item.id),
+                      icon: const Icon(Icons.add_circle, color: AppTheme.primary),
+                    ))
               else
-                IconButton(
-                  onPressed: () => notifier.incrementAppliance(item.id),
-                  icon: const Icon(Icons.add_circle, color: AppTheme.primary),
-                ),
+                _buildAddButton(item.id, activeVariant, notifier),
             ],
           ),
-          if (isSelected && item.variants != null) ...[
-            const SizedBox(height: 16),
-            _buildVariantSelector(item, selectedVariant!, notifier),
+          if (item.variants != null) ...[
+            const SizedBox(height: 12),
+            _buildVariantSelector(item, activeVariant!, notifier),
+            if (isAnySelected) ...[
+              const SizedBox(height: 12),
+              ...selections.map((s) => Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${s.variant}:', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  _buildQuantityPicker(item.id, s.variant, s.quantity, notifier),
+                ],
+              )),
+            ],
           ],
         ],
       ),

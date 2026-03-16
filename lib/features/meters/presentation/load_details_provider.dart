@@ -2,30 +2,50 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/appliance.dart';
 import 'package:flutter/material.dart';
 
+class ApplianceSelection {
+  final String applianceId;
+  final String? variant;
+  final int quantity;
+
+  const ApplianceSelection({
+    required this.applianceId,
+    this.variant,
+    this.quantity = 1,
+  });
+
+  ApplianceSelection copyWith({String? applianceId, String? variant, int? quantity}) {
+    return ApplianceSelection(
+      applianceId: applianceId ?? this.applianceId,
+      variant: variant ?? this.variant,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+}
+
 class LoadDetailsState {
   final ApplianceCategory selectedCategory;
-  final Map<String, int> selections; // Appliance ID -> Quantity
+  final List<ApplianceSelection> applianceSelections;
   final List<CustomLoad> customSelections;
-  final Map<String, String> selectedVariants; // Appliance ID -> Variant Name
+  final Map<String, String> activeVariants; // Appliance ID -> Last UI-selected variant
 
   LoadDetailsState({
     this.selectedCategory = ApplianceCategory.residential,
-    this.selections = const {},
+    this.applianceSelections = const [],
     this.customSelections = const [],
-    this.selectedVariants = const {},
+    this.activeVariants = const {},
   });
 
   LoadDetailsState copyWith({
     ApplianceCategory? selectedCategory,
-    Map<String, int>? selections,
+    List<ApplianceSelection>? applianceSelections,
     List<CustomLoad>? customSelections,
-    Map<String, String>? selectedVariants,
+    Map<String, String>? activeVariants,
   }) {
     return LoadDetailsState(
       selectedCategory: selectedCategory ?? this.selectedCategory,
-      selections: selections ?? this.selections,
+      applianceSelections: applianceSelections ?? this.applianceSelections,
       customSelections: customSelections ?? this.customSelections,
-      selectedVariants: selectedVariants ?? this.selectedVariants,
+      activeVariants: activeVariants ?? this.activeVariants,
     );
   }
 }
@@ -58,49 +78,73 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
     state = state.copyWith(selectedCategory: category);
   }
 
-  void incrementAppliance(String id) {
-    final currentQty = state.selections[id] ?? 0;
-    
-    // If first time adding, and it has variants, pick the first one
-    Map<String, String> newVariants = Map.from(state.selectedVariants);
-    if (currentQty == 0) {
+  void incrementAppliance(String id, {String? variant}) {
+    // If no variant provided, use the last active variant or default to first
+    String? targetVariant = variant;
+    if (targetVariant == null) {
       final allApps = ref.read(appliancesProvider);
       final appliance = allApps.firstWhere((a) => a.id == id);
       if (appliance.variants != null && appliance.variants!.isNotEmpty) {
-        newVariants[id] = appliance.variants!.keys.first;
+        targetVariant = state.activeVariants[id] ?? appliance.variants!.keys.first;
       }
     }
 
-    state = state.copyWith(
-      selections: {
-        ...state.selections,
-        id: currentQty + 1,
-      },
-      selectedVariants: newVariants,
+    final existingIndex = state.applianceSelections.indexWhere(
+      (s) => s.applianceId == id && s.variant == targetVariant
     );
+
+    List<ApplianceSelection> newList = List.from(state.applianceSelections);
+    Map<String, String> newActiveVariants = Map.from(state.activeVariants);
+    if (targetVariant != null) {
+      newActiveVariants[id] = targetVariant;
+    }
+
+    if (existingIndex != -1) {
+      newList[existingIndex] = newList[existingIndex].copyWith(
+        quantity: newList[existingIndex].quantity + 1
+      );
+    } else {
+      newList.add(ApplianceSelection(
+        applianceId: id,
+        variant: targetVariant,
+        quantity: 1
+      ));
+    }
+
+    state = state.copyWith(
+      applianceSelections: newList,
+      activeVariants: newActiveVariants,
+    );
+  }
+
+  void decrementAppliance(String id, {String? variant}) {
+    String? targetVariant = variant;
+    if (targetVariant == null) {
+      targetVariant = state.activeVariants[id];
+    }
+
+    final existingIndex = state.applianceSelections.indexWhere(
+      (s) => s.applianceId == id && s.variant == targetVariant
+    );
+
+    if (existingIndex == -1) return;
+
+    List<ApplianceSelection> newList = List.from(state.applianceSelections);
+    if (newList[existingIndex].quantity <= 1) {
+      newList.removeAt(existingIndex);
+    } else {
+      newList[existingIndex] = newList[existingIndex].copyWith(
+        quantity: newList[existingIndex].quantity - 1
+      );
+    }
+
+    state = state.copyWith(applianceSelections: newList);
   }
 
   void setApplianceVariant(String id, String variant) {
-    state = state.copyWith(
-      selectedVariants: {
-        ...state.selectedVariants,
-        id: variant,
-      },
-    );
-  }
-
-  void decrementAppliance(String id) {
-    final currentQty = state.selections[id] ?? 0;
-    if (currentQty <= 0) return;
-    
-    final newSelections = Map<String, int>.from(state.selections);
-    if (currentQty == 1) {
-      newSelections.remove(id);
-    } else {
-      newSelections[id] = currentQty - 1;
-    }
-    
-    state = state.copyWith(selections: newSelections);
+    Map<String, String> newActiveVariants = Map.from(state.activeVariants);
+    newActiveVariants[id] = variant;
+    state = state.copyWith(activeVariants: newActiveVariants);
   }
 
   void addCustomLoad(String name, int wattage) {
@@ -142,18 +186,16 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
 
   int calculateTotalWattage(List<Appliance> allAppliances) {
     int total = 0;
-    state.selections.forEach((id, qty) {
-      final appliance = allAppliances.firstWhere((a) => a.id == id);
+    for (var selection in state.applianceSelections) {
+      final appliance = allAppliances.firstWhere((a) => a.id == selection.applianceId);
       
-      // Check if a variant is selected and has wattage
       int wattage = appliance.averageWattage;
-      final selectedVariant = state.selectedVariants[id];
-      if (selectedVariant != null && appliance.variants != null) {
-        wattage = appliance.variants![selectedVariant] ?? wattage;
+      if (selection.variant != null && appliance.variants != null) {
+        wattage = appliance.variants![selection.variant] ?? wattage;
       }
       
-      total += wattage * qty;
-    });
+      total += wattage * selection.quantity;
+    }
     for (var custom in state.customSelections) {
       total += custom.wattage * custom.quantity;
     }
