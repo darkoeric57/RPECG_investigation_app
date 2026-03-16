@@ -63,8 +63,13 @@ class Meter {
     required this.type,
     required this.status,
     required this.installationDate,
+    this.findings = '',
+    this.initialReadings = '',
     this.isSynced = false,
   });
+
+  @HiveField(16) final String findings;
+  @HiveField(17) final String initialReadings;
 
   Meter copyWith({
     String? id,
@@ -82,6 +87,8 @@ class Meter {
     MeteringType? type,
     MeterStatus? status,
     DateTime? installationDate,
+    String? findings,
+    String? initialReadings,
     bool? isSynced,
   }) {
     return Meter(
@@ -100,6 +107,8 @@ class Meter {
       type: type ?? this.type,
       status: status ?? this.status,
       installationDate: installationDate ?? this.installationDate,
+      findings: findings ?? this.findings,
+      initialReadings: initialReadings ?? this.initialReadings,
       isSynced: isSynced ?? this.isSynced,
     );
   }

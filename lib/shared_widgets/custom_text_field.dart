@@ -14,6 +14,8 @@ class CustomTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String? initialValue;
   final bool isLoading;
+  final int? maxLines;
+  final bool autoFocus;
   final TextCapitalization textCapitalization;
 
   const CustomTextField({
@@ -30,6 +32,8 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
     this.initialValue,
     this.isLoading = false,
+    this.maxLines = 1,
+    this.autoFocus = false,
     this.textCapitalization = TextCapitalization.words,
   });
 
@@ -56,6 +60,8 @@ class CustomTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           textCapitalization: textCapitalization,
+          maxLines: maxLines,
+          autofocus: autoFocus,
           validator: validator,
           onChanged: onChanged,
           style: const TextStyle(

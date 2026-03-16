@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_button.dart';
 import '../../../shared_widgets/custom_text_field.dart';
+import '../../../core/services/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +14,40 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
+  final _biometricService = BiometricService();
+  bool _isBiometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    final available = await _biometricService.isBiometricAvailable();
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = available;
+      });
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final authenticated = await _biometricService.authenticate(
+      reason: 'Please authenticate to log in to your staff account',
+    );
+
+    if (authenticated && mounted) {
+      context.go('/');
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Biometric authentication failed or cancelled'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -247,37 +282,54 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppTheme.borderLight),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 10,
+                          if (_isBiometricAvailable)
+                            Column(
+                              children: [
+                                InkWell(
+                                  onTap: _handleBiometricLogin,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: AppTheme.borderLight),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.05),
+                                          blurRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.fingerprint,
+                                      size: 32,
+                                      color: AppTheme.primary, // Changed to primary to show it's active
+                                      semanticLabel: 'Biometric Login',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Touch ID / Face ID',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textLight,
+                                    letterSpacing: 1,
+                                  ),
                                 ),
                               ],
+                            )
+                          else
+                            const Text(
+                              'Biometrics not available on this device',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: AppTheme.textLight,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.fingerprint,
-                              size: 32,
-                              color: AppTheme.textLight,
-                              semanticLabel: 'Biometric Login',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Touch ID / Face ID',
-                            style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textLight,
-                              letterSpacing: 1,
-                            ),
-                          ),
                         ],
                       ),
                     ),

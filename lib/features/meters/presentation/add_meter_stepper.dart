@@ -280,13 +280,34 @@ class AddMeterStepper extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _buildSelectionCard(Icons.factory_outlined, 'METER BRAND', 'Select Brand')),
+                    Expanded(
+                      child: _buildSelectionCard(
+                        Icons.factory_outlined, 
+                        'METER BRAND', 
+                        state.meterBrand.isEmpty ? 'Select Brand' : state.meterBrand,
+                        onTap: () => _showBrandPicker(context, notifier),
+                      ),
+                    ),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildSelectionCard(Icons.speed, 'READINGS', 'Initial KWh')),
+                    Expanded(
+                      child: _buildSelectionCard(
+                        Icons.speed, 
+                        'READINGS', 
+                        state.initialReadings.isEmpty ? 'Initial KWh' : state.initialReadings,
+                        onTap: () => _showReadingsInput(context, notifier),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildFullWidthSelectionCard(Icons.electric_bolt_outlined, 'METER RATING', 'Choose Capacity (Amp)'),
+                _buildFindingsSelector(context, state.findings, notifier),
+                const SizedBox(height: 12),
+                _buildFullWidthSelectionCard(
+                  Icons.electric_bolt_outlined, 
+                  'METER RATING', 
+                  state.meterRating.isEmpty ? 'Choose Capacity (Amp)' : state.meterRating,
+                  onTap: () => _showRatingPicker(context, notifier),
+                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -503,8 +524,13 @@ class AddMeterStepper extends ConsumerWidget {
           title: 'Meter Technical Info',
           rows: [
             _buildReviewRow('Meter ID', state.meterId),
+            _buildReviewRow('Meter Brand', state.meterBrand),
+            _buildReviewRow('Meter Rating', state.meterRating),
+            _buildReviewRow('Initial Readings', state.initialReadings),
             _buildReviewRow('Tariff Class', state.tariffClass, isLabel: true),
             _buildReviewRow('Phase Type', state.meterPhase),
+            if (state.findings.isNotEmpty)
+              _buildReviewRow('Technical Finding', state.findings),
           ],
         ),
         const SizedBox(height: 16),
@@ -716,46 +742,252 @@ class AddMeterStepper extends ConsumerWidget {
     );
   }
 
-  Widget _buildSelectionCard(IconData icon, String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: AppTheme.primary, size: 24),
-          const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
-          Text(subtitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-        ],
+  Widget _buildSelectionCard(IconData icon, String title, String subtitle, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderLight),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppTheme.primary, size: 24),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
+            Text(
+              subtitle, 
+              style: TextStyle(
+                fontSize: 14, 
+                fontWeight: FontWeight.bold, 
+                color: subtitle.contains('Select') || subtitle.contains('Choose') || subtitle.contains('Initial') ? AppTheme.primary.withOpacity(0.5) : AppTheme.primary
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFullWidthSelectionCard(IconData icon, String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
+  Widget _buildFullWidthSelectionCard(IconData icon, String title, String subtitle, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderLight),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primary, size: 24),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
+                Text(
+                  subtitle, 
+                  style: TextStyle(
+                    fontSize: 14, 
+                    fontWeight: FontWeight.bold, 
+                    color: subtitle.contains('Choose') ? AppTheme.primary.withOpacity(0.5) : AppTheme.primary
+                  )
+                ),
+              ],
+            ),
+            const Spacer(),
+            const Icon(Icons.chevron_right, color: AppTheme.textLight),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppTheme.primary, size: 24),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textLight)),
-              Text(subtitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-            ],
+    );
+  }
+
+  Widget _buildFindingsSelector(BuildContext context, String currentFinding, AddMeterNotifier notifier) {
+    return GestureDetector(
+      onTap: () => _showFindingsPicker(context, notifier),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: currentFinding.isNotEmpty ? AppTheme.primary.withOpacity(0.2) : AppTheme.borderLight),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.assignment_late_outlined, color: AppTheme.primary, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TECHNICAL FINDINGS',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: AppTheme.textLight, letterSpacing: 1),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    currentFinding.isEmpty ? 'Select technical finding' : currentFinding,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: currentFinding.isEmpty ? AppTheme.textLight.withOpacity(0.5) : AppTheme.textDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textLight),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFindingsPicker(BuildContext context, AddMeterNotifier notifier) {
+    final findings = [
+      'Tampered Meter',
+      'Meter By-pass',
+      'Already Disconnected',
+      'Relay Not Tripping',
+      'Communication Error',
+      'Direct Connection',
+      'Unauthorized Service conn.',
+      'Unit Recovery',
+      'Others',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TECHNICAL FINDINGS',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.5),
+                    ),
+                    Text(
+                      'Select field observation',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, size: 20, color: AppTheme.textLight),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: findings.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final item = findings[index];
+                  return ListTile(
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (item == 'Others') {
+                        _showCustomFindingInput(context, notifier);
+                      } else {
+                        notifier.updateFindings(item);
+                      }
+                    },
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    tileColor: Colors.grey.shade50,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                      child: Icon(
+                        item == 'Others' ? Icons.edit_note : Icons.adjust,
+                        color: AppTheme.primary,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(
+                      item,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark, fontSize: 13),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textLight),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCustomFindingInput(BuildContext context, AddMeterNotifier notifier) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Other Finding', style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+        content: CustomTextField(
+          label: 'Describe Observation',
+          hint: 'Type findings here...',
+          controller: controller,
+          maxLines: 3,
+          prefixIcon: Icons.edit_note,
+          autoFocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL', style: TextStyle(color: AppTheme.textLight, fontWeight: FontWeight.bold)),
           ),
-          const Spacer(),
-          const Icon(Icons.chevron_right, color: AppTheme.textLight),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                notifier.updateFindings(controller.text);
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('ADD FINDING', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -1183,6 +1415,197 @@ class AddMeterStepper extends ConsumerWidget {
       pageBuilder: (context, anim1, anim2) {
         return VideoPlayerOverlay(videoPath: videoPath);
       },
+    );
+  }
+
+  void _showBrandPicker(BuildContext context, AddMeterNotifier notifier) {
+    final brands = [
+      'Landis+Gyr',
+      'Itron',
+      'Holley',
+      'Hexing',
+      'Clou',
+      'Wasion',
+      'Nuri',
+      'Others',
+    ];
+
+    _showGenericPicker(
+      context, 
+      title: 'METER BRAND', 
+      subtitle: 'Select manufacturer', 
+      items: brands, 
+      onSelected: (item) {
+        if (item == 'Others') {
+          _showCustomInput(context, 'Other Brand', 'Enter meter brand', (val) => notifier.updateMeterBrand(val));
+        } else {
+          notifier.updateMeterBrand(item);
+        }
+      }
+    );
+  }
+
+  void _showRatingPicker(BuildContext context, AddMeterNotifier notifier) {
+    final ratings = [
+      '5 (60)A',
+      '10 (100)A',
+      '20 (80)A',
+      '40 (100)A',
+      'Others',
+    ];
+
+    _showGenericPicker(
+      context, 
+      title: 'METER RATING', 
+      subtitle: 'Select capacity', 
+      items: ratings, 
+      onSelected: (item) {
+        if (item == 'Others') {
+          _showCustomInput(context, 'Other Rating', 'Enter meter rating (e.g. 30A)', (val) => notifier.updateMeterRating(val));
+        } else {
+          notifier.updateMeterRating(item);
+        }
+      }
+    );
+  }
+
+  void _showReadingsInput(BuildContext context, AddMeterNotifier notifier) {
+    _showCustomInput(
+      context, 
+      'Current Readings', 
+      'Enter Initial KWh', 
+      (val) => notifier.updateInitialReadings(val),
+      keyboardType: TextInputType.number,
+      icon: Icons.speed,
+    );
+  }
+
+  void _showGenericPicker(BuildContext context, {required String title, required String subtitle, required List<String> items, required Function(String) onSelected}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.5),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, size: 20, color: AppTheme.textLight),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: items.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return ListTile(
+                    onTap: () {
+                      Navigator.pop(context);
+                      onSelected(item);
+                    },
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    tileColor: Colors.grey.shade50,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                      child: Icon(
+                        item == 'Others' ? Icons.edit_note : Icons.adjust,
+                        color: AppTheme.primary,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(
+                      item,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark, fontSize: 13),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textLight),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCustomInput(BuildContext context, String title, String hint, Function(String) onSubmitted, {TextInputType keyboardType = TextInputType.text, IconData icon = Icons.edit_note}) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomTextField(
+              label: title,
+              hint: hint,
+              controller: controller,
+              maxLines: 1,
+              prefixIcon: icon,
+              autoFocus: true,
+              keyboardType: keyboardType,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL', style: TextStyle(color: AppTheme.textLight, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                onSubmitted(controller.text);
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

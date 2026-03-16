@@ -12,14 +12,15 @@ class AddMeterState {
   final String gpsCoordinates;
   final String tariffActivity;
   final String geocode;
-  final int? estimatedLoadWatts;
-  
+  final String findings;
+  final String initialReadings;
   final String meterId;
   final String spnNumber;
   final String meterBrand;
   final String meterRating;
   final String meterPhase;
   final String meteringType;
+  final int? estimatedLoadWatts;
   final List<String> capturedImagePaths;
   final String? capturedVideoPath;
   final bool isLocationLoading;
@@ -33,6 +34,8 @@ class AddMeterState {
     this.gpsCoordinates = '',
     this.tariffActivity = 'Residential',
     this.geocode = '',
+    this.findings = '',
+    this.initialReadings = '',
     this.meterId = '',
     this.spnNumber = '',
     this.meterBrand = '',
@@ -61,6 +64,8 @@ class AddMeterState {
       'gpsCoordinates': gpsCoordinates,
       'tariffActivity': tariffActivity,
       'geocode': geocode,
+      'findings': findings,
+      'initialReadings': initialReadings,
       'meterId': meterId,
       'spnNumber': spnNumber,
       'meterBrand': meterBrand,
@@ -91,6 +96,8 @@ class AddMeterState {
       gpsCoordinates: map['gpsCoordinates'] ?? '',
       tariffActivity: map['tariffActivity'] ?? 'Residential',
       geocode: map['geocode'] ?? '',
+      findings: map['findings'] ?? '',
+      initialReadings: map['initialReadings'] ?? '',
       meterId: map['meterId'] ?? '',
       spnNumber: map['spnNumber'] ?? '',
       meterBrand: map['meterBrand'] ?? '',
@@ -112,6 +119,8 @@ class AddMeterState {
     String? gpsCoordinates,
     String? tariffActivity,
     String? geocode,
+    String? findings,
+    String? initialReadings,
     String? meterId,
     String? spnNumber,
     String? meterBrand,
@@ -132,6 +141,8 @@ class AddMeterState {
       gpsCoordinates: gpsCoordinates ?? this.gpsCoordinates,
       tariffActivity: tariffActivity ?? this.tariffActivity,
       geocode: geocode ?? this.geocode,
+      findings: findings ?? this.findings,
+      initialReadings: initialReadings ?? this.initialReadings,
       meterId: meterId ?? this.meterId,
       spnNumber: spnNumber ?? this.spnNumber,
       meterBrand: meterBrand ?? this.meterBrand,
@@ -206,6 +217,16 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
 
   void updateGeocode(String val) {
     state = state.copyWith(geocode: val);
+    _saveDraft();
+  }
+
+  void updateFindings(String val) {
+    state = state.copyWith(findings: val);
+    _saveDraft();
+  }
+
+  void updateInitialReadings(String val) {
+    state = state.copyWith(initialReadings: val);
     _saveDraft();
   }
 
