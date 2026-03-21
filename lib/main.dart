@@ -6,11 +6,33 @@ import 'core/providers.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'features/meters/domain/meter.dart';
 import 'features/dashboard/domain/investigator.dart';
+import 'package:backendless_sdk/backendless_sdk.dart';
+import 'core/config/app_config.dart';
+import 'core/services/backendless_auth_service.dart';
+import 'main.reflectable.dart';
+
+import 'package:google_sign_in/google_sign_in.dart' as auth;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  initializeReflectable();
+  // Initialize Google Sign-In (Required by v7.2.0)
+  try {
+    await auth.GoogleSignIn.instance.initialize(
+      serverClientId: AppConfig.googleServerClientId, // Centralized Client ID
+    );
+  } catch (e) {
+    debugPrint('Google Sign-In initialization failed: $e');
+  }
+
   await Hive.initFlutter();
+  
+  // Initialize Backendless
+  await Backendless.initApp(
+    applicationId: AppConfig.backendlessApplicationId,
+    iosApiKey: AppConfig.backendlessIosApiKey,
+    androidApiKey: AppConfig.backendlessAndroidApiKey,
+  );
   
   // Register Adapters
   Hive.registerAdapter(MeterStatusAdapter());
@@ -26,9 +48,22 @@ void main() async {
   await Hive.openBox<Meter>('meters_box');
   await Hive.openBox<Investigator>('investigators_box');
 
+  // Pre-load user session if it exists
+  final container = ProviderContainer();
+  final authService = BackendlessAuthService();
+  try {
+    if (await authService.isValidLogin()) {
+      final user = await authService.getCurrentUser();
+      container.read(userProvider.notifier).state = user;
+    }
+  } catch (_) {
+    // Ignore errors during pre-load
+  }
+
   runApp(
-    const ProviderScope(
-      child: UtilityApp(),
+    UncontrolledProviderScope(
+      container: container,
+      child: const UtilityApp(),
     ),
   );
 }

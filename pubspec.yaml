@@ -21,13 +21,35 @@ dependencies:
   path_provider: ^2.1.5
   video_player: ^2.8.2
   local_auth: 2.3.0
+  backendless_sdk:
+    path: plugins/backendless_sdk
+  http: ^1.2.2
+  reflectable: ^4.0.6
+  googleapis: ^13.2.0
+  googleapis_auth: ^1.6.0
+  path: ^1.9.0
+
+  local_auth_android: any
+  local_auth_darwin: any
+  google_sign_in: ^7.2.0
+  extension_google_sign_in_as_googleapis_auth: ^3.0.0
+  fl_chart: 0.70.2
+  pdf: 3.11.1
+  printing: 5.13.2
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  flutter_driver:
     sdk: flutter
   flutter_lints: ^6.0.0
   hive_generator: ^2.0.1
   build_runner: ^2.4.8
 
+dependency_overrides:
+  http: ^1.2.2
+
 flutter:
   uses-material-design: true
+  assets:
+    - assets/

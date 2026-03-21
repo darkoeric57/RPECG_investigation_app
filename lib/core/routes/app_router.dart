@@ -9,6 +9,9 @@ import '../../features/meters/presentation/add_meter_stepper.dart';
 import '../../features/meters/presentation/submission_success_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../shared_widgets/persistent_nav_bar.dart';
+import '../../features/dashboard/presentation/analytics_screen.dart';
+
+import '../../core/services/backendless_auth_service.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -16,7 +19,23 @@ final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>()
 class AppRouter {
   static final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/login',
+    initialLocation: '/',
+    redirect: (context, state) async {
+      final authService = BackendlessAuthService();
+      final bool loggedIn = await authService.isValidLogin();
+      final bool loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+
+      if (!loggedIn) {
+        return loggingIn ? null : '/login';
+      }
+
+      // if the user is logged in but still on the login/signup page, send them home
+      if (loggingIn) {
+        return '/';
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/login',
@@ -58,6 +77,10 @@ class AppRouter {
               final id = state.pathParameters['id']!;
               return MeterDetailsScreen(meterId: id);
             },
+          ),
+          GoRoute(
+            path: '/analytics',
+            builder: (context, state) => const AnalyticsScreen(),
           ),
         ],
       ),

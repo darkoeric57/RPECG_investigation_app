@@ -61,7 +61,7 @@ class AppTheme {
           fontSize: 12,
           letterSpacing: 1.2,
         ),
-        prefixIconColor: primary.withOpacity(0.6),
+        prefixIconColor: primary.withValues(alpha: 0.6),
         suffixIconColor: textLight,
       ),
       cardTheme: CardThemeData(
@@ -132,11 +132,11 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

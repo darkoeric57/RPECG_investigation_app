@@ -32,14 +32,18 @@ class MeterAdapter extends TypeAdapter<Meter> {
       type: fields[12] as MeteringType,
       status: fields[13] as MeterStatus,
       installationDate: fields[14] as DateTime,
+      findings: fields[16] as String,
+      initialReadings: fields[17] as String,
       isSynced: fields[15] as bool,
+      capturedImagePaths: (fields[18] as List).cast<String>(),
+      capturedVideoPath: fields[19] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Meter obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +75,15 @@ class MeterAdapter extends TypeAdapter<Meter> {
       ..writeByte(14)
       ..write(obj.installationDate)
       ..writeByte(15)
-      ..write(obj.isSynced);
+      ..write(obj.isSynced)
+      ..writeByte(16)
+      ..write(obj.findings)
+      ..writeByte(17)
+      ..write(obj.initialReadings)
+      ..writeByte(18)
+      ..write(obj.capturedImagePaths)
+      ..writeByte(19)
+      ..write(obj.capturedVideoPath);
   }
 
   @override

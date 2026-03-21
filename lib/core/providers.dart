@@ -3,13 +3,24 @@ import '../features/meters/data/meter_repository.dart';
 import '../features/dashboard/data/investigator_repository.dart';
 import '../features/meters/domain/meter.dart';
 import '../features/dashboard/domain/investigator.dart';
+import 'services/google_drive_service.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart' as auth;
+import 'package:backendless_sdk/backendless_sdk.dart';
 
 // Theme Logic
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
+// Auth State
+final userProvider = StateProvider<BackendlessUser?>((ref) => null);
+
 // Repositories
 final meterRepositoryProvider = Provider<MeterRepository>((ref) => HiveMeterRepository());
+final googleDriveServiceProvider = Provider<GoogleDriveService>((ref) => GoogleDriveService());
+final googleSignInAccountProvider = StreamProvider<auth.GoogleSignInAccount?>((ref) {
+  final service = ref.watch(googleDriveServiceProvider);
+  return service.onCurrentUserChanged;
+});
 final investigatorRepositoryProvider = Provider<InvestigatorRepository>((ref) => HiveInvestigatorRepository());
 
 // Data Streams / Futures
@@ -48,6 +59,21 @@ class SearchFilterNotifier extends StateNotifier<SearchFilters> {
 }
 
 final searchFilterProvider = StateNotifierProvider<SearchFilterNotifier, SearchFilters>((ref) => SearchFilterNotifier());
+
+// Dashboard Sync Filter Logic
+enum MeterSyncFilter { all, synced, local }
+enum AnalyticsFilter { last7Days, last30Days, allTime }
+
+final dashboardFilterProvider = StateProvider<MeterSyncFilter>((ref) => MeterSyncFilter.all);
+final analyticsFilterProvider = StateProvider<AnalyticsFilter>((ref) => AnalyticsFilter.last30Days);
+
+final dashboardFilteredMetersProvider = FutureProvider<List<Meter>>((ref) async {
+  final allMeters = await ref.watch(metersProvider.future);
+  final filter = ref.watch(dashboardFilterProvider);
+  
+  if (filter == MeterSyncFilter.all) return allMeters;
+  return allMeters.where((m) => filter == MeterSyncFilter.synced ? m.isSynced : !m.isSynced).toList();
+});
 
 final searchedMetersProvider = FutureProvider<List<Meter>>((ref) async {
   final filters = ref.watch(searchFilterProvider);

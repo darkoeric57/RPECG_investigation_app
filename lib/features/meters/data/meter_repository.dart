@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import '../domain/meter.dart';
+import '../../../core/services/backendless_data_service.dart';
 
 abstract class MeterRepository {
   Future<List<Meter>> getMeters();
@@ -7,6 +8,7 @@ abstract class MeterRepository {
   Future<void> addMeter(Meter meter);
   Future<List<Meter>> searchMeters(String query);
   Future<void> syncMeters();
+  Future<void> pullMeters();
   Future<String> generateCsvReport();
   Future<void> clearAll();
 }
@@ -82,13 +84,38 @@ class HiveMeterRepository implements MeterRepository {
   Future<void> syncMeters() async {
     final box = await _getBox();
     final unsynced = box.values.where((m) => !m.isSynced).toList();
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 2));
+    final dataService = BackendlessDataService();
 
     for (var meter in unsynced) {
-      final key = box.keys.firstWhere((k) => box.get(k)?.id == meter.id);
-      await box.put(key, meter.copyWith(isSynced: true));
+      try {
+        await dataService.saveMeter(meter);
+        final key = box.keys.firstWhere((k) => box.get(k)?.id == meter.id);
+        await box.put(key, meter.copyWith(isSynced: true));
+      } catch (e) {
+        // If sync fails for one meter, continue to next but don't mark as synced
+        continue;
+      }
+    }
+  }
+  
+  @override
+  Future<void> pullMeters() async {
+    final box = await _getBox();
+    final dataService = BackendlessDataService();
+    
+    try {
+      final remoteMeters = await dataService.getRemoteMeters();
+      final localIds = box.values.map((m) => m.id).toSet();
+      
+      for (var remote in remoteMeters) {
+        if (!localIds.contains(remote.id)) {
+          // If we have a local mock version with the same ID, Hive might have it. 
+          // But our check covers it already.
+          await box.add(remote.copyWith(isSynced: true));
+        }
+      }
+    } catch (e) {
+      // Pull failed, possibly offline
     }
   }
 

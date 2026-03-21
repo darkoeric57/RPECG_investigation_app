@@ -66,10 +66,14 @@ class Meter {
     this.findings = '',
     this.initialReadings = '',
     this.isSynced = false,
+    this.capturedImagePaths = const [],
+    this.capturedVideoPath,
   });
 
   @HiveField(16) final String findings;
   @HiveField(17) final String initialReadings;
+  @HiveField(18) final List<String> capturedImagePaths;
+  @HiveField(19) final String? capturedVideoPath;
 
   Meter copyWith({
     String? id,
@@ -89,6 +93,8 @@ class Meter {
     DateTime? installationDate,
     String? findings,
     String? initialReadings,
+    List<String>? capturedImagePaths,
+    String? capturedVideoPath,
     bool? isSynced,
   }) {
     return Meter(
@@ -109,7 +115,33 @@ class Meter {
       installationDate: installationDate ?? this.installationDate,
       findings: findings ?? this.findings,
       initialReadings: initialReadings ?? this.initialReadings,
+      capturedImagePaths: capturedImagePaths ?? this.capturedImagePaths,
+      capturedVideoPath: capturedVideoPath ?? this.capturedVideoPath,
       isSynced: isSynced ?? this.isSynced,
+    );
+  }
+
+  factory Meter.fromMap(Map<dynamic, dynamic> map) {
+    return Meter(
+      id: map['meterId'] as String,
+      customerName: map['customerName'] as String,
+      address: map['address'] as String,
+      telephone: map['telephone'] as String,
+      tariffClass: map['tariffClass'] as String,
+      gpsCoordinates: map['gpsCoordinates'] as String,
+      tariffActivity: TariffActivity.values.byName(map['tariffActivity'] as String),
+      geocode: map['geocode'] as String,
+      spnNumber: map['spnNumber'] as String,
+      brand: map['brand'] as String,
+      rating: map['rating'] as String,
+      phase: MeterPhase.values.byName(map['phase'] as String),
+      type: MeteringType.values.byName(map['type'] as String),
+      status: MeterStatus.values.byName(map['status'] as String),
+      installationDate: DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int),
+      initialReadings: map['initialReadings'] as String? ?? '',
+      capturedImagePaths: map['capturedImagePaths'] != null ? List<String>.from(map['capturedImagePaths'] as List) : const [],
+      capturedVideoPath: map['capturedVideoPath'] as String?,
+      isSynced: true,
     );
   }
 }

@@ -28,10 +28,15 @@ class SyncState {
 class SyncNotifier extends Notifier<SyncState> {
   @override
   SyncState build() {
-    // We can't watch the metersProvider here directly as it's a FutureProvider
-    // Instead we will refresh and count manually when needed or on init
-    _updateUnsyncedCount();
+    // Initial data pull and count update
+    _initialSync();
     return SyncState();
+  }
+
+  Future<void> _initialSync() async {
+    await ref.read(meterRepositoryProvider).pullMeters();
+    _updateUnsyncedCount();
+    ref.invalidate(metersProvider);
   }
 
   Future<void> _updateUnsyncedCount() async {
@@ -41,12 +46,20 @@ class SyncNotifier extends Notifier<SyncState> {
   }
 
   Future<void> performSync() async {
-    if (state.isSyncing || state.unsyncedCount == 0) return;
+    if (state.isSyncing) return;
+    
+    // We pull first to get new remote changes, then push local changes
 
     state = state.copyWith(isSyncing: true);
     
     try {
-      await ref.read(meterRepositoryProvider).syncMeters();
+      final repo = ref.read(meterRepositoryProvider);
+      
+      // Pull remote data
+      await repo.pullMeters();
+      
+      // Sync local data to remote
+      await repo.syncMeters();
       
       final now = DateTime.now();
       final timeStr = "${now.hour}:${now.minute.toString().padLeft(2, '0')}";
@@ -60,6 +73,19 @@ class SyncNotifier extends Notifier<SyncState> {
       // Refresh the meters provider so UI updates
       ref.invalidate(metersProvider);
       ref.invalidate(searchedMetersProvider);
+    } catch (e) {
+      state = state.copyWith(isSyncing: false);
+    }
+  }
+
+  Future<void> forcePull() async {
+    if (state.isSyncing) return;
+    state = state.copyWith(isSyncing: true);
+    try {
+      await ref.read(meterRepositoryProvider).pullMeters();
+      _updateUnsyncedCount();
+      ref.invalidate(metersProvider);
+      state = state.copyWith(isSyncing: false);
     } catch (e) {
       state = state.copyWith(isSyncing: false);
     }

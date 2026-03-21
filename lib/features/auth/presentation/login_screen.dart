@@ -4,23 +4,49 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_button.dart';
 import '../../../shared_widgets/custom_text_field.dart';
 import '../../../core/services/biometric_service.dart';
+import '../../../core/services/backendless_auth_service.dart';
+import 'package:backendless_sdk/backendless_sdk.dart';
 
-class LoginScreen extends StatefulWidget {
+import '../../../core/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _rememberMe = false;
   final _biometricService = BiometricService();
   bool _isBiometricAvailable = false;
+  final TextEditingController _emailController = TextEditingController(); // Changed from Staff ID to email to match Backendless
+  final TextEditingController _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
     _checkBiometrics();
+    _checkExistingSession();
+  }
+
+  Future<void> _checkExistingSession() async {
+    final authService = BackendlessAuthService();
+    try {
+      final isValid = await authService.isValidLogin();
+        if (isValid && mounted) {
+          final user = await authService.getCurrentUser();
+          if (user != null && mounted) {
+            ref.read(userProvider.notifier).state = user;
+            context.go('/');
+          }
+        }
+    } catch (_) {
+      // Ignore errors during silent check
+    }
   }
 
   Future<void> _checkBiometrics() async {
@@ -32,13 +58,35 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _handleBiometricLogin() async {
+    final authService = BackendlessAuthService();
+    // Check if we have a valid login first
+    final isValid = await authService.isValidLogin();
+    
+    if (isValid) {
+      final user = await authService.getCurrentUser();
+      ref.read(userProvider.notifier).state = user;
+      if (mounted) context.go('/');
+      return;
+    }
+
     final authenticated = await _biometricService.authenticate(
       reason: 'Please authenticate to log in to your staff account',
     );
 
     if (authenticated && mounted) {
-      context.go('/');
+      final user = await authService.getCurrentUser();
+      if (mounted) {
+        ref.read(userProvider.notifier).state = user;
+        context.go('/');
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -49,10 +97,48 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+    );
+
+    try {
+      final authService = BackendlessAuthService();
+      final user = await authService.login(_emailController.text.trim(), _passwordController.text);
+      ref.read(userProvider.notifier).state = user;
+
+      if (mounted) {
+        Navigator.pop(context); // Remove loading
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Remove loading
+        String message = e.toString();
+        if (e is BackendlessException) {
+          if (e.code == '3064') {
+            message = 'This account is already logged in on another device or session. Please logout there first or check your Backendless settings.';
+          } else {
+            message = e.message;
+          }
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: $message'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
       body: LayoutBuilder(
@@ -144,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Transform.translate(
-                        offset: const Offset(0, -15), // Smaller offset
+                        offset: const Offset(0, -15),
                         child: Container(
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
@@ -158,99 +244,108 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Welcome Back',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textDark,
-                                ),
-                              ),
-                              const Text(
-                                'Please sign in to your staff account',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textLight,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                               CustomTextField(
-                                 label: 'Staff ID',
-                                 hint: 'EMP-2024-001',
-                                 prefixIcon: Icons.account_circle_outlined,
-                                 textCapitalization: TextCapitalization.none,
-                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'PASSWORD',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.textLight,
-                                      letterSpacing: 1.2,
-                                    ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Welcome Back',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textDark,
                                   ),
-                                  TextButton(
-                                    onPressed: () {},
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: const Text(
-                                      'Forgot?',
+                                ),
+                                const Text(
+                                  'Please sign in to your staff account',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textLight,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                 CustomTextField(
+                                   label: 'Email Address',
+                                   hint: 'Enter your email',
+                                   prefixIcon: Icons.email_outlined,
+                                   controller: _emailController,
+                                   keyboardType: TextInputType.emailAddress,
+                                   textCapitalization: TextCapitalization.none,
+                                   validator: (value) => value == null || value.isEmpty ? 'Email is required' : null,
+                                 ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'PASSWORD',
                                       style: TextStyle(
-                                        color: AppTheme.primary,
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold,
+                                        color: AppTheme.textLight,
+                                        letterSpacing: 1.2,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                               CustomTextField(
-                                 label: '', // Label already shown above
-                                 hint: '••••••••',
-                                 prefixIcon: Icons.lock_outline,
-                                 suffixIcon: Icons.visibility_off_outlined,
-                                 obscureText: true,
-                                 textCapitalization: TextCapitalization.none,
-                               ),
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: AppTheme.primary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
+                                    TextButton(
+                                      onPressed: () {},
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text(
+                                        'Forgot?',
+                                        style: TextStyle(
+                                          color: AppTheme.primary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                    onChanged: (val) => setState(() => _rememberMe = val!),
-                                  ),
-                                  const Text(
-                                    'Keep me signed in',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppTheme.textDark,
+                                  ],
+                                ),
+                                 CustomTextField(
+                                   label: '', // Label already shown above
+                                   hint: '••••••••',
+                                   prefixIcon: Icons.lock_outline,
+                                   controller: _passwordController,
+                                   obscureText: _obscurePassword,
+                                   textCapitalization: TextCapitalization.none,
+                                   suffixIcon: _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                   onSuffixTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                                   validator: (value) => value == null || value.isEmpty ? 'Password is required' : null,
+                                 ),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _rememberMe,
+                                      activeColor: AppTheme.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      onChanged: (val) => setState(() => _rememberMe = val!),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              CustomButton(
-                                text: 'Sign In to Dashboard',
-                                icon: Icons.arrow_forward,
-                                type: ButtonType.accent,
-                                onPressed: () => context.go('/'),
-                              ),
-                            ],
+                                    const Text(
+                                      'Keep me signed in',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                CustomButton(
+                                  text: 'Sign In to Dashboard',
+                                  icon: Icons.arrow_forward,
+                                  type: ButtonType.accent,
+                                  onPressed: _handleLogin,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -349,7 +444,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(color: AppTheme.textLight, fontSize: 12),
                             ),
                             TextButton(
-                              onPressed: () => context.push('/signup'),
+                              onPressed: () {
+                                if (context.mounted) {
+                                  context.push('/signup');
+                                }
+                              },
                               child: const Text(
                                 'Sign up now',
                                 style: TextStyle(

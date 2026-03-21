@@ -36,7 +36,7 @@ class LoadSummaryScreen extends ConsumerWidget {
 
   Widget _buildAppBar(BuildContext context) {
     return SliverAppBar(
-      backgroundColor: Colors.white.withOpacity(0.8),
+      backgroundColor: Colors.white.withValues(alpha: 0.8),
       floating: true,
       elevation: 0,
       leading: IconButton(
@@ -85,7 +85,7 @@ class LoadSummaryScreen extends ConsumerWidget {
             Text(
               'Review the technical distribution of electrical loads for the selected residential unit before finalizing the report.',
               style: TextStyle(
-                color: AppTheme.textLight.withOpacity(0.8),
+                color: AppTheme.textLight.withValues(alpha: 0.8),
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -137,9 +137,15 @@ class LoadSummaryScreen extends ConsumerWidget {
     // Standard Appliances
     for (var selection in state.applianceSelections) {
       final appliance = allAppliances.firstWhere((a) => a.id == selection.applianceId);
-      int wattage = appliance.averageWattage;
-      if (selection.variant != null && appliance.variants != null) {
-        wattage = appliance.variants![selection.variant] ?? wattage;
+      
+      int wattage;
+      if (selection.overriddenWattage != null) {
+        wattage = selection.overriddenWattage!;
+      } else {
+        wattage = appliance.averageWattage;
+        if (selection.variant != null && appliance.variants != null) {
+          wattage = appliance.variants![selection.variant] ?? wattage;
+        }
       }
       
       final displayName = selection.variant != null 
@@ -181,7 +187,7 @@ class LoadSummaryScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E3A8A).withOpacity(0.06),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
             blurRadius: 32,
             offset: const Offset(0, 12),
           ),
@@ -246,9 +252,15 @@ class LoadSummaryScreen extends ConsumerWidget {
 
     for (var selection in state.applianceSelections) {
       final app = allAppliances.firstWhere((a) => a.id == selection.applianceId);
-      int wattage = app.averageWattage;
-      if (selection.variant != null && app.variants != null) {
-        wattage = app.variants![selection.variant] ?? wattage;
+      
+      int wattage;
+      if (selection.overriddenWattage != null) {
+        wattage = selection.overriddenWattage!;
+      } else {
+        wattage = app.averageWattage;
+        if (selection.variant != null && app.variants != null) {
+          wattage = app.variants![selection.variant] ?? wattage;
+        }
       }
       final value = wattage * selection.quantity;
       
@@ -290,11 +302,11 @@ class LoadSummaryScreen extends ConsumerWidget {
                 children: [
                   _buildChartBar(hvac / total, const Color(0xFFFFE24C)),
                   const SizedBox(width: 4),
-                  _buildChartBar(appliances / total, const Color(0xFFFFE24C).withOpacity(0.4)),
+                  _buildChartBar(appliances / total, const Color(0xFFFFE24C).withValues(alpha: 0.4)),
                   const SizedBox(width: 4),
-                  _buildChartBar(lighting / total, const Color(0xFFFFE24C).withOpacity(0.2)),
+                  _buildChartBar(lighting / total, const Color(0xFFFFE24C).withValues(alpha: 0.2)),
                   const SizedBox(width: 4),
-                  _buildChartBar(others / total, const Color(0xFFFFE24C).withOpacity(0.1)),
+                  _buildChartBar(others / total, const Color(0xFFFFE24C).withValues(alpha: 0.1)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -338,7 +350,7 @@ class LoadSummaryScreen extends ConsumerWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 32,
               offset: const Offset(0, 12),
             ),

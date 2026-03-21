@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/device_service.dart';
+import '../../../core/providers.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hive/hive.dart';
 
@@ -24,6 +26,7 @@ class AddMeterState {
   final List<String> capturedImagePaths;
   final String? capturedVideoPath;
   final bool isLocationLoading;
+  final bool isUploading;
 
   AddMeterState({
     this.currentStep = 0,
@@ -46,13 +49,13 @@ class AddMeterState {
     this.capturedVideoPath,
     this.estimatedLoadWatts,
     this.isLocationLoading = false,
+    this.isUploading = false,
   });
 
-  bool get isStep1Valid => 
-    customerName.isNotEmpty && address.isNotEmpty && telephone.isNotEmpty;
+  bool get isStep1Valid =>
+      customerName.isNotEmpty && address.isNotEmpty && telephone.isNotEmpty;
 
-  bool get isStep2Valid => 
-    meterId.isNotEmpty && meterBrand.isNotEmpty && capturedImagePaths.isNotEmpty;
+  bool get isStep2Valid => meterId.isNotEmpty && meterBrand.isNotEmpty;
 
   Map<String, dynamic> toMap() {
     return {
@@ -131,6 +134,7 @@ class AddMeterState {
     String? capturedVideoPath,
     int? estimatedLoadWatts,
     bool? isLocationLoading,
+    bool? isUploading,
   }) {
     return AddMeterState(
       currentStep: currentStep ?? this.currentStep,
@@ -153,13 +157,14 @@ class AddMeterState {
       capturedVideoPath: capturedVideoPath ?? this.capturedVideoPath,
       estimatedLoadWatts: estimatedLoadWatts ?? this.estimatedLoadWatts,
       isLocationLoading: isLocationLoading ?? this.isLocationLoading,
+      isUploading: isUploading ?? this.isUploading,
     );
   }
 }
 
 class AddMeterNotifier extends Notifier<AddMeterState> {
   static const String _draftKey = 'add_meter_draft';
-  
+
   @override
   AddMeterState build() {
     try {
@@ -169,7 +174,7 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
         return AddMeterState.fromMap(Map<dynamic, dynamic>.from(draft));
       }
     } catch (_) {
-      // Box not open yet or other error, return default state
+      // Ignore errors during silent check
     }
     return AddMeterState();
   }
@@ -266,7 +271,8 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
     final pos = await service.getCurrentLocation();
     if (pos != null) {
       state = state.copyWith(
-        gpsCoordinates: '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
+        gpsCoordinates:
+            '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
         isLocationLoading: false,
       );
       _saveDraft();
@@ -278,11 +284,9 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
   Future<void> simulateQrScan() async {
     state = state.copyWith(isLocationLoading: true);
     await Future.delayed(const Duration(seconds: 1));
-    final randomId = 'MET-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}-QR';
-    state = state.copyWith(
-      meterId: randomId,
-      isLocationLoading: false,
-    );
+    final randomId =
+        'MET-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}-QR';
+    state = state.copyWith(meterId: randomId, isLocationLoading: false);
     _saveDraft();
   }
 
@@ -329,8 +333,12 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
   }
 
   void nextStep() {
-    if (state.currentStep == 0 && !state.isStep1Valid) return;
-    if (state.currentStep == 1 && !state.isStep2Valid) return;
+    if (state.currentStep == 0 && !state.isStep1Valid) {
+      return;
+    }
+    if (state.currentStep == 1 && !state.isStep2Valid) {
+      return;
+    }
 
     if (state.currentStep < 2) {
       state = state.copyWith(currentStep: state.currentStep + 1);
@@ -344,6 +352,45 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
       _saveDraft();
     }
   }
+
+  Future<Map<String, dynamic>?> uploadMediaToDrive() async {
+    state = state.copyWith(isUploading: true);
+    try {
+      final driveService = ref.read(googleDriveServiceProvider);
+
+      List<String> imageUrls = [];
+      String? videoUrl;
+
+      // 1. Upload captured images
+      for (var i = 0; i < state.capturedImagePaths.length; i++) {
+        final path = state.capturedImagePaths[i];
+        final url = await driveService.uploadFile(
+          file: File(path),
+          fileName: 'meter_${state.meterId}_img_$i.jpg',
+        );
+        if (url != null) {
+          imageUrls.add(url);
+        }
+      }
+
+      // 2. Upload captured video if available
+      if (state.capturedVideoPath != null) {
+        videoUrl = await driveService.uploadFile(
+          file: File(state.capturedVideoPath!),
+          fileName: 'meter_${state.meterId}_video.mp4',
+        );
+      }
+
+      state = state.copyWith(isUploading: false);
+
+      return {'imageUrls': imageUrls, 'videoUrl': videoUrl};
+    } catch (e) {
+      state = state.copyWith(isUploading: false);
+      rethrow;
+    }
+  }
 }
 
-final addMeterProvider = NotifierProvider<AddMeterNotifier, AddMeterState>(AddMeterNotifier.new);
+final addMeterProvider = NotifierProvider<AddMeterNotifier, AddMeterState>(
+  AddMeterNotifier.new,
+);

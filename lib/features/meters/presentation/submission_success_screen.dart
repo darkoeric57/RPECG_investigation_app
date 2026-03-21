@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_button.dart';
+import '../../dashboard/presentation/sync_provider.dart';
 
-class SubmissionSuccessScreen extends StatelessWidget {
+class SubmissionSuccessScreen extends ConsumerWidget {
   const SubmissionSuccessScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -24,7 +26,7 @@ class SubmissionSuccessScreen extends StatelessWidget {
                     width: 140,
                     height: 140,
                     decoration: BoxDecoration(
-                      color: AppTheme.secondary.withOpacity(0.2),
+                      color: AppTheme.secondary.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -61,11 +63,26 @@ class SubmissionSuccessScreen extends StatelessWidget {
               const SizedBox(height: 48),
               CustomButton(
                 text: 'Back to Dashboard',
-                onPressed: () => context.go('/'),
+                onPressed: () {
+                  // Trigger background sync when returning
+                  ref.read(syncProvider.notifier).performSync();
+                  context.go('/');
+                },
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Receipt Generation'),
+                      content: const Text('Digital receipt generation is being processed. You will be notified once it is ready for download.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+                      ],
+                    ),
+                  );
+                },
                 child: const Text(
                   'VIEW RECEIPT',
                   style: TextStyle(

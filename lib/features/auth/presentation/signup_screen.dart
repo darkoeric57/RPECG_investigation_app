@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_button.dart';
 import '../../../shared_widgets/custom_text_field.dart';
+import '../../../core/services/backendless_auth_service.dart';
+import 'package:backendless_sdk/backendless_sdk.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -326,11 +328,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 text: 'SIGN UP',
                 icon: Icons.arrow_forward,
                 type: ButtonType.accent,
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    context.go('/');
-                  }
-                },
+                onPressed: _handleSignup,
               ),
             ),
           ],
@@ -517,5 +515,49 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+    );
+
+    try {
+      final authService = BackendlessAuthService();
+      await authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+        staffId: _staffIdController.text.trim(),
+        region: _selectedRegion,
+        accountType: _accountType,
+        groupNo: _groupNoController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Remove loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully! Please log in.')),
+        );
+        context.go('/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Remove loading
+        String message = e.toString();
+        if (e is BackendlessException) {
+          message = e.message;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Signup failed: $message'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
   }
 }

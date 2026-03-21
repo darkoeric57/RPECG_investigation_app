@@ -43,14 +43,14 @@ class _VideoPlayerOverlayState extends State<VideoPlayerOverlay> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.9),
+      backgroundColor: Colors.black.withValues(alpha: 0.9),
       body: Stack(
         children: [
           // Background Blur
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(color: Colors.black.withOpacity(0.5)),
+              child: Container(color: Colors.black.withValues(alpha: 0.5)),
             ),
           ),
 
@@ -107,7 +107,7 @@ class _VideoPlayerOverlayState extends State<VideoPlayerOverlay> {
                                     filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                                     child: Container(
                                       padding: const EdgeInsets.all(8),
-                                      color: Colors.white.withOpacity(0.1),
+                                      color: Colors.white.withValues(alpha: 0.1),
                                       child: const Icon(Icons.close, color: Colors.white, size: 24),
                                     ),
                                   ),
@@ -131,7 +131,7 @@ class _VideoPlayerOverlayState extends State<VideoPlayerOverlay> {
                               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                               child: Container(
                                 padding: const EdgeInsets.all(20),
-                                color: Colors.white.withOpacity(0.15),
+                                color: Colors.white.withValues(alpha: 0.15),
                                 child: Icon(
                                   _controller.value.isPlaying
                                       ? Icons.pause_rounded
@@ -153,7 +153,7 @@ class _VideoPlayerOverlayState extends State<VideoPlayerOverlay> {
                               filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                               child: Container(
                                 padding: const EdgeInsets.all(20),
-                                color: Colors.white.withOpacity(0.08),
+                                color: Colors.white.withValues(alpha: 0.08),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [

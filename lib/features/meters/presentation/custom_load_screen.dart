@@ -15,7 +15,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
   final _nameController = TextEditingController();
   final _wattsController = TextEditingController();
   ApplianceCategory _selectedCategory = ApplianceCategory.residential;
-  double _intensity = 0.5;
+  final double _intensity = 0.5;
 
   @override
   void dispose() {
@@ -76,7 +76,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
               Text(
                 'Precisely track energy consumption by adding custom electrical profiles to your investigation dashboard.',
                 style: TextStyle(
-                  color: AppTheme.textLight.withOpacity(0.8),
+                  color: AppTheme.textLight.withValues(alpha: 0.8),
                   fontSize: 15,
                   height: 1.5,
                 ),
@@ -97,7 +97,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                         decoration: InputDecoration(
                           hintText: 'e.g., Industrial HVAC Unit',
-                          hintStyle: TextStyle(color: AppTheme.textLight.withOpacity(0.4)),
+                          hintStyle: TextStyle(color: AppTheme.textLight.withValues(alpha: 0.4)),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.zero,
                         ),
@@ -130,7 +130,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
                           ),
                           boxShadow: isSelected ? [
                             BoxShadow(
-                              color: AppTheme.primary.withOpacity(0.3),
+                              color: AppTheme.primary.withValues(alpha: 0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             )
@@ -173,9 +173,9 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
                         width: 180,
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -195,7 +195,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
                                 ),
                                 decoration: InputDecoration(
                                   hintText: '0',
-                                  hintStyle: TextStyle(color: Colors.black.withOpacity(0.2)),
+                                  hintStyle: TextStyle(color: Colors.black.withValues(alpha: 0.2)),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,
@@ -330,7 +330,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
-                color: backgroundColor != null ? Colors.black.withOpacity(0.6) : AppTheme.textLight,
+                color: backgroundColor != null ? Colors.black.withValues(alpha: 0.6) : AppTheme.textLight,
                 letterSpacing: 1.2,
               ),
             ),
@@ -346,9 +346,9 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.borderLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -405,7 +405,7 @@ class _CustomLoadScreenState extends ConsumerState<CustomLoadScreen> {
         minimumSize: const Size(double.infinity, 70),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
         elevation: 20,
-        shadowColor: AppTheme.primary.withOpacity(0.3),
+        shadowColor: AppTheme.primary.withValues(alpha: 0.3),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

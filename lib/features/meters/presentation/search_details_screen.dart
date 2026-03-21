@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers.dart';
 import '../domain/meter.dart';
+import 'dart:io';
 
 class SearchDetailsScreen extends ConsumerWidget {
   const SearchDetailsScreen({super.key});
@@ -60,7 +61,7 @@ class SearchDetailsScreen extends ConsumerWidget {
           ),
 
           // Filters / Chips
-          Container(
+          SizedBox(
             height: 60,
             child: ListView(
               scrollDirection: Axis.horizontal,
@@ -134,25 +135,32 @@ class SearchDetailsScreen extends ConsumerWidget {
       borderRadius: BorderRadius.circular(24),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.borderLight.withOpacity(0.5)),
+          border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 50,
-              height: 50,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: AppTheme.backgroundLight,
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(16),
+                image: meter.capturedImagePaths.isNotEmpty
+                    ? (meter.capturedImagePaths.first.startsWith('http')
+                        ? DecorationImage(image: NetworkImage(meter.capturedImagePaths.first), fit: BoxFit.cover)
+                        : DecorationImage(image: FileImage(File(meter.capturedImagePaths.first)), fit: BoxFit.cover))
+                    : null,
               ),
-              child: const Icon(Icons.bolt, color: AppTheme.primary),
+              child: meter.capturedImagePaths.isEmpty 
+                ? const Icon(Icons.bolt, color: AppTheme.primary) 
+                : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -162,11 +170,19 @@ class SearchDetailsScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(meter.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Expanded(
+                        child: Text(
+                          meter.id, 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -176,13 +192,47 @@ class SearchDetailsScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  Text(meter.customerName, style: const TextStyle(fontSize: 14, color: AppTheme.textDark)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          meter.customerName, 
+                          style: const TextStyle(fontSize: 14, color: AppTheme.textDark),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: meter.isSynced ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          meter.isSynced ? 'SYNCED' : 'LOCAL',
+                          style: TextStyle(
+                            fontSize: 7, 
+                            fontWeight: FontWeight.bold, 
+                            color: meter.isSynced ? Colors.green : Colors.orange,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       const Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textLight),
                       const SizedBox(width: 4),
-                      Text(meter.address, style: const TextStyle(fontSize: 11, color: AppTheme.textLight)),
+                      Expanded(
+                        child: Text(
+                          meter.address, 
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textLight),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ],

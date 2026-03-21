@@ -6,18 +6,26 @@ class ApplianceSelection {
   final String applianceId;
   final String? variant;
   final int quantity;
+  final int? overriddenWattage;
 
   const ApplianceSelection({
     required this.applianceId,
     this.variant,
     this.quantity = 1,
+    this.overriddenWattage,
   });
 
-  ApplianceSelection copyWith({String? applianceId, String? variant, int? quantity}) {
+  ApplianceSelection copyWith({
+    String? applianceId,
+    String? variant,
+    int? quantity,
+    int? overriddenWattage,
+  }) {
     return ApplianceSelection(
       applianceId: applianceId ?? this.applianceId,
       variant: variant ?? this.variant,
       quantity: quantity ?? this.quantity,
+      overriddenWattage: overriddenWattage ?? this.overriddenWattage,
     );
   }
 }
@@ -119,9 +127,7 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
 
   void decrementAppliance(String id, {String? variant}) {
     String? targetVariant = variant;
-    if (targetVariant == null) {
-      targetVariant = state.activeVariants[id];
-    }
+    targetVariant ??= state.activeVariants[id];
 
     final existingIndex = state.applianceSelections.indexWhere(
       (s) => s.applianceId == id && s.variant == targetVariant
@@ -138,6 +144,17 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
       );
     }
 
+    state = state.copyWith(applianceSelections: newList);
+  }
+
+  void updateApplianceWattage(String id, String? variant, int newWattage) {
+    final index = state.applianceSelections.indexWhere(
+      (s) => s.applianceId == id && s.variant == variant
+    );
+    if (index == -1) return;
+
+    final newList = List<ApplianceSelection>.from(state.applianceSelections);
+    newList[index] = newList[index].copyWith(overriddenWattage: newWattage);
     state = state.copyWith(applianceSelections: newList);
   }
 
@@ -187,6 +204,11 @@ class LoadDetailsNotifier extends Notifier<LoadDetailsState> {
   int calculateTotalWattage(List<Appliance> allAppliances) {
     int total = 0;
     for (var selection in state.applianceSelections) {
+      if (selection.overriddenWattage != null) {
+        total += selection.overriddenWattage! * selection.quantity;
+        continue;
+      }
+
       final appliance = allAppliances.firstWhere((a) => a.id == selection.applianceId);
       
       int wattage = appliance.averageWattage;

@@ -16,7 +16,20 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    project.evaluationDependsOn(":app")
+    afterEvaluate {
+        if (project.hasProperty("android")) {
+            val android = project.extensions.getByName("android")
+            try {
+                val namespaceMethod = android.javaClass.getMethod("setNamespace", String::class.java)
+                val currentNamespace = android.javaClass.getMethod("getNamespace").invoke(android)
+                if (currentNamespace == null) {
+                    namespaceMethod.invoke(android, "com.example.files.${project.name.replace("-", "_")}")
+                }
+            } catch (e: Exception) {
+                // If the namespace property doesn't exist or reflection fails, skip
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

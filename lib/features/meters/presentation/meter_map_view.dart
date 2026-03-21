@@ -69,11 +69,11 @@ class _MeterMapViewState extends State<MeterMapView> {
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -114,7 +114,7 @@ class _MeterMapViewState extends State<MeterMapView> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10),
           ],
         ),
         child: Icon(icon, color: AppTheme.primary, size: 20),
@@ -123,7 +123,7 @@ class _MeterMapViewState extends State<MeterMapView> {
   }
 
   Widget _buildBottomCategories() {
-    return Container(
+    return SizedBox(
       height: 100,
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -143,10 +143,10 @@ class _MeterMapViewState extends State<MeterMapView> {
       margin: const EdgeInsets.only(right: 12),
       width: 120,
       decoration: BoxDecoration(
-        color: isActive ? AppTheme.primary : Colors.white.withOpacity(0.9),
+        color: isActive ? AppTheme.primary : Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       child: Column(

@@ -6,6 +6,7 @@ import '../domain/meter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import '../../../core/services/pdf_service.dart';
 
 class MeterDetailsScreen extends ConsumerWidget {
   final String meterId;
@@ -33,13 +34,22 @@ class MeterDetailsScreen extends ConsumerWidget {
             data: (meters) {
               final meter = meters.where((m) => m.id == meterId).firstOrNull;
               if (meter == null) return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () => _shareMeter(meter),
+              return Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    tooltip: 'Export PDF',
+                    onPressed: () => PdfService.generateMeterReport(meter),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined),
+                    onPressed: () => _shareMeter(meter),
+                  ),
+                ],
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
         ],
       ),
@@ -105,14 +115,14 @@ class MeterDetailsScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.borderLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.bolt, color: statusColor, size: 32),
@@ -164,7 +174,7 @@ class MeterDetailsScreen extends ConsumerWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.borderLight.withOpacity(0.5)),
+            border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
           ),
           child: Column(
             children: children,

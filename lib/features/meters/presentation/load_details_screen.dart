@@ -30,7 +30,7 @@ class LoadDetailsScreen extends ConsumerWidget {
               _buildCategoryTabs(state, notifier),
               _buildApplianceGrid(filteredAppliances, state, notifier),
               _buildEfficiencyInsight(),
-              _buildOtherAppliances(filteredAppliances, state, notifier),
+              _buildOtherAppliances(context, filteredAppliances, state, notifier),
               _buildCustomLoads(context, state, notifier),
               _buildAddCustomLoadButton(context, notifier),
               const SliverToBoxAdapter(child: SizedBox(height: 220)), // Space for bottom sheet
@@ -45,7 +45,7 @@ class LoadDetailsScreen extends ConsumerWidget {
   Widget _buildAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      backgroundColor: Colors.white.withOpacity(0.8),
+      backgroundColor: Colors.white.withValues(alpha: 0.8),
       elevation: 0,
       flexibleSpace: ClipRect(
         child: BackdropFilter(
@@ -82,7 +82,7 @@ class LoadDetailsScreen extends ConsumerWidget {
         child: Text(
           'Select the category and appliances to calculate the total utility load.',
           style: TextStyle(
-            color: AppTheme.textLight.withOpacity(0.7),
+            color: AppTheme.textLight.withValues(alpha: 0.7),
             fontSize: 14,
             fontWeight: FontWeight.w500,
             height: 1.5,
@@ -110,7 +110,7 @@ class LoadDetailsScreen extends ConsumerWidget {
                   color: isSelected ? AppTheme.accent : Colors.white,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: isSelected 
-                      ? [BoxShadow(color: AppTheme.accent.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                      ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))]
                       : null,
                   border: Border.all(color: isSelected ? AppTheme.accent : AppTheme.borderLight),
                 ),
@@ -149,7 +149,7 @@ class LoadDetailsScreen extends ConsumerWidget {
             final item = flagshipItems[index];
             final selections = state.applianceSelections.where((s) => s.applianceId == item.id).toList();
             final activeVariant = state.activeVariants[item.id] ?? (item.variants?.keys.first);
-            return _buildApplianceCard(item, selections, activeVariant, notifier);
+            return _buildApplianceCard(context, item, selections, activeVariant, notifier);
           },
           childCount: flagshipItems.length,
         ),
@@ -157,7 +157,7 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildApplianceCard(Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
+  Widget _buildApplianceCard(BuildContext context, Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
     final isAnySelected = selections.isNotEmpty;
     final totalQty = selections.fold<int>(0, (sum, s) => sum + s.quantity);
     
@@ -170,7 +170,7 @@ class LoadDetailsScreen extends ConsumerWidget {
         border: Border.all(color: isAnySelected ? AppTheme.primary.withAlpha(50) : AppTheme.borderLight),
         boxShadow: [
           BoxShadow(
-            color: isAnySelected ? AppTheme.primary.withOpacity(0.08) : Colors.black.withOpacity(0.03),
+            color: isAnySelected ? AppTheme.primary.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.03),
             blurRadius: isAnySelected ? 20 : 10,
             offset: const Offset(0, 4),
           )
@@ -190,7 +190,7 @@ class LoadDetailsScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: (item.isHeavyLoad ? AppTheme.primary : AppTheme.secondary).withOpacity(0.1),
+                      color: (item.isHeavyLoad ? AppTheme.primary : AppTheme.secondary).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(item.icon, color: item.isHeavyLoad ? AppTheme.primary : AppTheme.textDark, size: 24),
@@ -212,7 +212,7 @@ class LoadDetailsScreen extends ConsumerWidget {
               if (item.variants != null) ...[
                 Text(
                   'Select Variant:',
-                  style: TextStyle(fontSize: 9, color: AppTheme.textLight.withOpacity(0.7), fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 9, color: AppTheme.textLight.withValues(alpha: 0.7), fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 _buildVariantSelector(item, activeVariant!, notifier),
@@ -221,27 +221,72 @@ class LoadDetailsScreen extends ConsumerWidget {
                   ...selections.map((s) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
+                          flex: 2,
                           child: Text(
                             '${s.variant}:', 
-                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.primary),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            final currentWattage = s.overriddenWattage ?? item.variants![s.variant]!;
+                            _showWattageEditDialog(context, item.id, s.variant, currentWattage, notifier);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '${s.overriddenWattage ?? item.variants![s.variant]}W',
+                                    style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(Icons.edit, size: 7, color: AppTheme.primary.withValues(alpha: 0.5)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         _buildQuantityPicker(item.id, s.variant, s.quantity, notifier),
                       ],
                     ),
                   )),
                 ],
               ] else ...[
-                Text(
-                  item.wattageDisplay,
-                  style: TextStyle(
-                    fontSize: 10, 
-                    color: isAnySelected ? AppTheme.primary : AppTheme.textLight.withOpacity(0.7), 
-                    fontWeight: FontWeight.bold
+                GestureDetector(
+                  onTap: isAnySelected ? () {
+                    final selection = selections.first;
+                    _showWattageEditDialog(context, item.id, null, selection.overriddenWattage ?? item.averageWattage, notifier);
+                  } : null,
+                  child: Row(
+                    children: [
+                      Text(
+                        isAnySelected && selections.first.overriddenWattage != null
+                            ? '${selections.first.overriddenWattage}W'
+                            : item.wattageDisplay,
+                        style: TextStyle(
+                          fontSize: 10, 
+                          color: isAnySelected ? AppTheme.primary : AppTheme.textLight.withValues(alpha: 0.7), 
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
+                      if (isAnySelected) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.edit, size: 10, color: AppTheme.primary.withValues(alpha: 0.5)),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -276,7 +321,7 @@ class LoadDetailsScreen extends ConsumerWidget {
                   color: isSelected ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: isSelected ? [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
                   ] : null,
                 ),
                 child: Center(
@@ -404,7 +449,7 @@ class LoadDetailsScreen extends ConsumerWidget {
             color: AppTheme.primary,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 10))
+              BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 10))
             ],
           ),
           child: const Stack(
@@ -435,7 +480,7 @@ class LoadDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildOtherAppliances(List<Appliance> filtered, LoadDetailsState state, LoadDetailsNotifier notifier) {
+  Widget _buildOtherAppliances(BuildContext context, List<Appliance> filtered, LoadDetailsState state, LoadDetailsNotifier notifier) {
     final others = filtered.skip(4).toList();
     if (others.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
@@ -458,14 +503,14 @@ class LoadDetailsScreen extends ConsumerWidget {
           ...others.map((item) {
             final selections = state.applianceSelections.where((s) => s.applianceId == item.id).toList();
             final activeVariant = state.activeVariants[item.id] ?? (item.variants?.keys.first);
-            return _buildOtherItemCard(item, selections, activeVariant, notifier);
+            return _buildOtherItemCard(context, item, selections, activeVariant, notifier);
           }),
         ]),
       ),
     );
   }
 
-  Widget _buildOtherItemCard(Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
+  Widget _buildOtherItemCard(BuildContext context, Appliance item, List<ApplianceSelection> selections, String? activeVariant, LoadDetailsNotifier notifier) {
     final isAnySelected = selections.isNotEmpty;
     final totalQty = selections.fold<int>(0, (sum, s) => sum + s.quantity);
 
@@ -490,7 +535,26 @@ class LoadDetailsScreen extends ConsumerWidget {
                   children: [
                     Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark)),
                     if (item.variants == null)
-                      Text(item.wattageDisplay, style: TextStyle(fontSize: 10, color: isAnySelected ? AppTheme.primary : AppTheme.textLight))
+                      GestureDetector(
+                        onTap: isAnySelected ? () {
+                          final selection = selections.first;
+                          _showWattageEditDialog(context, item.id, null, selection.overriddenWattage ?? item.averageWattage, notifier);
+                        } : null,
+                        child: Row(
+                          children: [
+                            Text(
+                              isAnySelected && selections.first.overriddenWattage != null
+                                  ? '${selections.first.overriddenWattage}W'
+                                  : item.wattageDisplay,
+                              style: TextStyle(fontSize: 10, color: isAnySelected ? AppTheme.primary : AppTheme.textLight),
+                            ),
+                            if (isAnySelected) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.edit, size: 10, color: AppTheme.primary.withValues(alpha: 0.5)),
+                            ],
+                          ],
+                        ),
+                      )
                     else
                       Text('Multiple variants supported', style: TextStyle(fontSize: 10, color: isAnySelected ? AppTheme.primary : AppTheme.textLight)),
                   ],
@@ -513,9 +577,41 @@ class LoadDetailsScreen extends ConsumerWidget {
             if (isAnySelected) ...[
               const SizedBox(height: 12),
               ...selections.map((s) => Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${s.variant}:', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${s.variant}:', 
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      final currentWattage = s.overriddenWattage ?? item.variants![s.variant]!;
+                      _showWattageEditDialog(context, item.id, s.variant, currentWattage, notifier);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${s.overriddenWattage ?? item.variants![s.variant]}W',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.edit, size: 10, color: AppTheme.primary.withValues(alpha: 0.5)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   _buildQuantityPicker(item.id, s.variant, s.quantity, notifier),
                 ],
               )),
@@ -593,10 +689,10 @@ class LoadDetailsScreen extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.secondary.withOpacity(0.1),
+              color: AppTheme.secondary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: AppTheme.secondary.withOpacity(0.3),
+                color: AppTheme.secondary.withValues(alpha: 0.3),
                 width: 2,
                 style: BorderStyle.none, // We'll use a custom painter if we want real dashes
               ),
@@ -639,7 +735,7 @@ class LoadDetailsScreen extends ConsumerWidget {
           color: Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -5))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, -5))
           ],
         ),
         child: Column(
@@ -666,7 +762,7 @@ class LoadDetailsScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.accent.withOpacity(0.1),
+                    color: AppTheme.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -698,6 +794,50 @@ class LoadDetailsScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showWattageEditDialog(BuildContext context, String id, String? variant, int currentWattage, LoadDetailsNotifier notifier) {
+    final controller = TextEditingController(text: currentWattage.toString());
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Adjust Wattage', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter the precise wattage for this appliance:', style: TextStyle(fontSize: 12, color: AppTheme.textLight)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                suffixText: 'Watts',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text);
+              if (val != null && val > 0) {
+                notifier.updateApplianceWattage(id, variant, val);
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            child: const Text('UPDATE', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

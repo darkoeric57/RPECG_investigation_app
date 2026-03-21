@@ -63,7 +63,9 @@ class CustomTextField extends StatelessWidget {
           maxLines: maxLines,
           autofocus: autoFocus,
           validator: validator,
-          onChanged: onChanged,
+          onChanged: (val) {
+            onChanged?.call(val);
+          },
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
