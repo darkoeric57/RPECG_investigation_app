@@ -56,7 +56,25 @@ class AddMeterStepper extends ConsumerWidget {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-              child: _buildCurrentStep(context, addMeterState.currentStep, ref),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.05, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: KeyedSubtree(
+                  key: ValueKey<int>(addMeterState.currentStep),
+                  child: _buildCurrentStep(context, addMeterState.currentStep, ref),
+                ),
+              ),
             ),
           ),
         ],
@@ -153,7 +171,12 @@ class AddMeterStepper extends ConsumerWidget {
     return Column(
       children: [
         _buildSectionHeader('CUSTOMER INFORMATION'),
-        Card(
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -1519,8 +1542,11 @@ class AddMeterStepper extends ConsumerWidget {
                   notifier.nextStep();
                 } else {
                   // 1. Upload media to Google Drive first
+                  Map<String, dynamic>? mediaUrls;
+                  bool isOfflineSave = false;
+
                   try {
-                    final mediaUrls = await notifier.uploadMediaToDrive();
+                    mediaUrls = await notifier.uploadMediaToDrive();
 
                     if (mediaUrls == null) {
                       if (context.mounted) {
@@ -1534,82 +1560,86 @@ class AddMeterStepper extends ConsumerWidget {
                       }
                       return;
                     }
-
-                    final imageUrls = List<String>.from(
-                      mediaUrls['imageUrls'] as List,
-                    );
-                    final videoUrl = mediaUrls['videoUrl'] as String?;
-
-                    // 2. Final submission logic with Drive URLs
-                    final meter = Meter(
-                      id: state.meterId,
-                      customerName: state.customerName,
-                      address: state.address,
-                      telephone: state.telephone,
-                      tariffClass: state.tariffClass,
-                      gpsCoordinates: state.gpsCoordinates,
-                      tariffActivity: state.tariffActivity == 'Residential'
-                          ? TariffActivity.residential
-                          : (state.tariffActivity == 'Commercial'
-                                ? TariffActivity.commercial
-                                : TariffActivity.industrial),
-                      geocode: state.geocode,
-                      spnNumber: state.spnNumber,
-                      brand: state.meterBrand,
-                      rating: state.meterRating,
-                      phase: state.meterPhase == '1-Phase'
-                          ? MeterPhase.single
-                          : MeterPhase.three,
-                      type: state.meteringType == 'Prepaid'
-                          ? MeteringType.prepaid
-                          : MeteringType.postpaid,
-                      status: MeterStatus.pending,
-                      installationDate: DateTime.now(),
-                      findings: state.findings,
-                      initialReadings: state.initialReadings,
-                      capturedImagePaths: imageUrls,
-                      capturedVideoPath: videoUrl,
-                      isSynced: false,
-                    );
-
-                    ref.read(meterRepositoryProvider).addMeter(meter).then((_) {
-                      if (context.mounted) {
-                        ref.read(syncProvider.notifier).notifyNewMeterAdded();
-                        notifier.reset();
-                        ref.invalidate(metersProvider);
-                        ref.invalidate(searchedMetersProvider);
-                        context.go('/success');
-                      }
-                    });
                   } catch (e) {
-                    if (context.mounted) {
-                      String message =
-                          'Failed to upload media to Google Drive.';
-                      if (e.toString().contains('QUOTA_ERROR')) {
-                        message =
-                            'Google Drive storage quota exceeded. Please clear some space in your Google Drive or use a different account.';
-                      } else if (e.toString().contains('NOT_SIGNED_IN')) {
-                        message =
-                            'Google Sign-In is required to upload media. Please try again and complete the sign-in process.';
-                      } else {
-                        message = 'An error occurred during upload: $e';
-                      }
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(message),
-                          backgroundColor: AppTheme.accent,
-                          duration: const Duration(seconds: 10),
-                          action: SnackBarAction(
-                            label: 'DISMISS',
-                            textColor: Colors.white,
-                            onPressed: () {},
+                    final errStr = e.toString();
+                    if (errStr.contains('QUOTA_ERROR') || errStr.contains('NOT_SIGNED_IN')) {
+                      if (context.mounted) {
+                        String message = errStr.contains('QUOTA') 
+                           ? 'Google Drive storage quota exceeded. Please clear some space'
+                           : 'Google Sign-In is required to upload media.';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(message),
+                            backgroundColor: AppTheme.accent,
                           ),
-                        ),
-                      );
+                        );
+                      }
+                      return;
                     }
-                    return;
+                    // Fallback to offline save for all other network errors
+                    isOfflineSave = true;
+                    mediaUrls = {
+                      'imageUrls': state.capturedImagePaths,
+                      'videoUrl': state.capturedVideoPath,
+                    };
                   }
+
+                  final imageUrls = List<String>.from(
+                    mediaUrls['imageUrls'] as List,
+                  );
+                  final videoUrl = mediaUrls['videoUrl'] as String?;
+
+                  // 2. Final submission logic with Drive URLs or Local Paths
+                  final meter = Meter(
+                    id: state.meterId,
+                    customerName: state.customerName,
+                    address: state.address,
+                    telephone: state.telephone,
+                    tariffClass: state.tariffClass,
+                    gpsCoordinates: state.gpsCoordinates,
+                    tariffActivity: state.tariffActivity == 'Residential'
+                        ? TariffActivity.residential
+                        : (state.tariffActivity == 'Commercial'
+                              ? TariffActivity.commercial
+                              : TariffActivity.industrial),
+                    geocode: state.geocode,
+                    spnNumber: state.spnNumber,
+                    brand: state.meterBrand,
+                    rating: state.meterRating,
+                    phase: state.meterPhase == '1-Phase'
+                        ? MeterPhase.single
+                        : MeterPhase.three,
+                    type: state.meteringType == 'Prepaid'
+                        ? MeteringType.prepaid
+                        : MeteringType.postpaid,
+                    status: MeterStatus.pending,
+                    installationDate: DateTime.now(),
+                    findings: state.findings,
+                    initialReadings: state.initialReadings,
+                    capturedImagePaths: imageUrls,
+                    capturedVideoPath: videoUrl,
+                    isSynced: false,
+                  );
+
+                  ref.read(meterRepositoryProvider).addMeter(meter).then((_) {
+                    if (context.mounted) {
+                      ref.read(syncProvider.notifier).notifyNewMeterAdded();
+                      notifier.reset();
+                      ref.invalidate(metersProvider);
+                      ref.invalidate(searchedMetersProvider);
+                      
+                      if (isOfflineSave) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Offline Mode: Meter saved locally and will sync later.'),
+                            backgroundColor: AppTheme.primary,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                      context.go('/success');
+                    }
+                  });
                 }
               },
             ),

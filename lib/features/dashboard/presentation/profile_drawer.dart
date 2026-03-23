@@ -59,10 +59,10 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
     final user = ref.watch(userProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final name = user?.getProperty('name') as String? ?? 'Guest User';
-    final staffId = user?.getProperty('staffId') as String? ?? 'N/A';
-    final region = user?.getProperty('region') as String? ?? 'N/A';
-    final groupNo = user?.getProperty('groupNo') as String? ?? 'N/A';
+    final name = user?.getProperty('name') as String? ?? '';
+    final staffId = user?.getProperty('staffId') as String? ?? '';
+    final region = user?.getProperty('region') as String? ?? '';
+    final groupNo = user?.getProperty('groupNo') as String? ?? '';
     final profilePicUrl = user?.getProperty('user-pic') as String?;
     final initials = name.isNotEmpty ? name.split(' ').map((e) => e[0]).take(2).join().toUpperCase() : '?';
 
@@ -193,22 +193,23 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'ID: $staffId',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                if (staffId.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'ID: $staffId',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                ),
                 if (googleAccount != null) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -451,11 +452,39 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
               title: 'Sign Out Account',
               color: AppTheme.accent,
               onTap: () async {
-                final authService = BackendlessAuthService();
-                await authService.logout();
-                ref.read(userProvider.notifier).state = null;
-                if (context.mounted) {
-                  context.go('/login');
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Sign Out?'),
+                    content: const Text('You will be taken back to the login screen. You can sign back in quickly using biometrics.'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                      TextButton(
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
+                        onPressed: () => Navigator.pop(ctx, true), 
+                        child: const Text('SIGN OUT'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  final authService = BackendlessAuthService();
+                  
+                  // Perform logout first (sets sessionActive to false in file)
+                  try {
+                    await authService.logout();
+                  } catch (_) {
+                    // Ignore logout errors (offline)
+                  }
+
+                  // Then clear local state
+                  ref.read(userProvider.notifier).state = null;
+                  
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
                 }
               },
             ),

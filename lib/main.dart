@@ -10,6 +10,7 @@ import 'package:backendless_sdk/backendless_sdk.dart';
 import 'core/config/app_config.dart';
 import 'core/services/backendless_auth_service.dart';
 import 'main.reflectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:google_sign_in/google_sign_in.dart' as auth;
 
@@ -26,6 +27,15 @@ void main() async {
   }
 
   await Hive.initFlutter();
+  
+  // Startup Diagnostic
+  try {
+    final authService = BackendlessAuthService();
+    final hasCreds = await authService.hasOfflineCredentials();
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Startup check - has credentials in file: $hasCreds');
+  } catch (e) {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Startup check failed: $e');
+  }
   
   // Initialize Backendless
   await Backendless.initApp(

@@ -14,19 +14,20 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
-subprojects {
+
     afterEvaluate {
         if (project.hasProperty("android")) {
             val android = project.extensions.getByName("android")
             try {
-                val namespaceMethod = android.javaClass.getMethod("setNamespace", String::class.java)
-                val currentNamespace = android.javaClass.getMethod("getNamespace").invoke(android)
+                // Safely attempt to set the namespace if it's missing (required for AGP 8+)
+                val getNamespace = android.javaClass.getMethod("getNamespace")
+                val currentNamespace = getNamespace.invoke(android)
                 if (currentNamespace == null) {
-                    namespaceMethod.invoke(android, "com.example.files.${project.name.replace("-", "_")}")
+                    val setNamespace = android.javaClass.getMethod("setNamespace", String::class.java)
+                    setNamespace.invoke(android, "com.example.files.${project.name.replace("-", "_")}")
                 }
             } catch (e: Exception) {
-                // If the namespace property doesn't exist or reflection fails, skip
+                // Ignore failures to find or invoke these methods (e.g. older AGP versions or non-Android projects)
             }
         }
     }

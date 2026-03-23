@@ -17,7 +17,36 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _animController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  )..forward();
+
+  late final Animation<double> _formFade = CurvedAnimation(
+    parent: _animController,
+    curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+  );
+  late final Animation<Offset> _formSlide = Tween<Offset>(
+    begin: const Offset(0, 0.15),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(
+    parent: _animController,
+    curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+  ));
+
+  late final Animation<double> _bioFade = CurvedAnimation(
+    parent: _animController,
+    curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+  );
+  late final Animation<Offset> _bioSlide = Tween<Offset>(
+    begin: const Offset(0, 0.3),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(
+    parent: _animController,
+    curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
+  ));
+
   bool _rememberMe = false;
   final _biometricService = BiometricService();
   bool _isBiometricAvailable = false;
@@ -51,6 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _checkBiometrics() async {
     final available = await _biometricService.isBiometricAvailable();
+    debugPrint('BIOMETRIC_DEBUG: Available on device: $available');
     if (mounted) {
       setState(() {
         _isBiometricAvailable = available;
@@ -60,21 +90,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _animController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleBiometricLogin() async {
+    debugPrint('BIOMETRIC_DEBUG: Starting handleBiometricLogin...');
     final authService = BackendlessAuthService();
-    // Check if we have a valid login first
-    final isValid = await authService.isValidLogin();
     
-    if (isValid) {
-      final user = await authService.getCurrentUser();
-      ref.read(userProvider.notifier).state = user;
-      if (mounted) context.go('/');
-      return;
+    // Check if we actually have credentials
+    final hasCreds = await authService.hasOfflineCredentials();
+    final biometricEnabled = await authService.isBiometricEnabled();
+    debugPrint('BIOMETRIC_DEBUG: hasCreds: $hasCreds, biometricEnabled: $biometricEnabled');
+    
+    if (!hasCreds) {
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Please login with password once to enable biometric offline login.'))
+         );
+       }
+       return;
     }
 
     final authenticated = await _biometricService.authenticate(
@@ -82,10 +119,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     if (authenticated && mounted) {
-      final user = await authService.getCurrentUser();
-      if (mounted) {
-        ref.read(userProvider.notifier).state = user;
-        context.go('/');
+      // Use offline credentials to login
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+      );
+      try {
+        final user = await authService.loginWithBiometrics();
+        if (user != null) {
+          ref.read(userProvider.notifier).state = user;
+          if (mounted) {
+            Navigator.pop(context); // hide loading
+            context.go('/');
+          }
+        } else {
+           if (mounted) {
+             Navigator.pop(context);
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(content: Text('Could not retrieve offline credentials.'))
+             );
+           }
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Offline login failed: ${e.toString()}'))
+          );
+        }
       }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +157,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showBiometricPrompt(BackendlessAuthService authService) async {
+    return showDialog(
+       context: context,
+       barrierDismissible: false,
+       builder: (ctx) => AlertDialog(
+          title: const Text('Enable Fast Login'),
+          content: const Text('Would you like to use biometrics (Touch ID / Face ID) to login easily when offline?'),
+          actions: [
+            TextButton(
+               onPressed: () {
+                 authService.setBiometricEnabled(false);
+                 Navigator.pop(ctx);
+               },
+               child: const Text('Not Now', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+               onPressed: () async {
+                 // Try to authenticate once
+                 final success = await _biometricService.authenticate(reason: 'Authenticate to enable fast login');
+                 if (success) {
+                   await authService.setBiometricEnabled(true);
+                   if (mounted) Navigator.pop(ctx);
+                 } else {
+                   if (mounted) {
+                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification failed.')));
+                     Navigator.pop(ctx);
+                   }
+                 }
+               },
+               child: const Text('Enable', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+            ),
+          ]
+       )
+    );
   }
 
   Future<void> _handleLogin() async {
@@ -109,10 +207,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final authService = BackendlessAuthService();
       final user = await authService.login(_emailController.text.trim(), _passwordController.text);
-      ref.read(userProvider.notifier).state = user;
-
+      
       if (mounted) {
         Navigator.pop(context); // Remove loading
+        
+        // Prompt for biometrics if available and not enabled yet
+        final hasBiometrics = await _biometricService.isBiometricAvailable();
+        if (hasBiometrics) {
+           final biometricEnabled = await authService.isBiometricEnabled();
+           if (!biometricEnabled && mounted) {
+              await _showBiometricPrompt(authService);
+           }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile synchronized for offline use.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        
+        ref.read(userProvider.notifier).state = user;
         context.go('/');
       }
     } catch (e) {
@@ -227,9 +345,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
 
                     // Login Form
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Transform.translate(
+                    FadeTransition(
+                      opacity: _formFade,
+                      child: SlideTransition(
+                        position: _formSlide,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Transform.translate(
                         offset: const Offset(0, -15),
                         child: Container(
                           padding: const EdgeInsets.all(18),
@@ -344,19 +466,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   type: ButtonType.accent,
                                   onPressed: _handleLogin,
                                 ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-
-                    const Spacer(flex: 2), // Encourage pushing down
+                  ),
+                  const Spacer(flex: 2), // Encourage pushing down
 
                     // Biometric Section
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
+                    FadeTransition(
+                      opacity: _bioFade,
+                      child: SlideTransition(
+                        position: _bioSlide,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
                         children: [
                           const Row(
                             children: [
@@ -428,8 +555,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ],
                       ),
                     ),
+                  ),
+                ),
 
-                    const Spacer(flex: 1),
+                const Spacer(flex: 1),
 
                     // Footer
                     SafeArea(

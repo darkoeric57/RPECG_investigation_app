@@ -25,6 +25,7 @@ class DashboardHome extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint('DASHBOARD_DEBUG: Building DashboardHome...');
     final metersAsync = ref.watch(metersProvider);
     final filteredMetersAsync = ref.watch(dashboardFilteredMetersProvider);
     final syncState = ref.watch(syncProvider);
