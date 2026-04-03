@@ -1,25 +1,36 @@
+import 'dart:convert' show utf8;
+import 'dart:typed_data' show Uint8List;
+import 'dart:io' as io;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers.dart';
 import '../../meters/domain/meter.dart';
-
 import 'profile_drawer.dart';
 import 'sync_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 class DashboardHome extends ConsumerWidget {
   const DashboardHome({super.key});
 
   Future<void> _exportAll(WidgetRef ref) async {
     final csv = await ref.read(meterRepositoryProvider).generateCsvReport();
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/all_records_export.csv');
-    await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)], text: 'Full Investigation Report');
+    
+    if (kIsWeb) {
+      final bytes = utf8.encode(csv);
+      await Share.shareXFiles(
+        [XFile.fromData(Uint8List.fromList(bytes), name: 'all_records_export.csv', mimeType: 'text/csv')],
+        text: 'Full Investigation Report',
+      );
+    } else {
+      final tempDir = await getTemporaryDirectory();
+      final file = io.File('${tempDir.path}/all_records_export.csv');
+      await file.writeAsString(csv);
+      await Share.shareXFiles([XFile(file.path)], text: 'Full Investigation Report');
+    }
   }
 
 
@@ -380,7 +391,9 @@ class DashboardHome extends ConsumerWidget {
               image: meter.capturedImagePaths.isNotEmpty
                   ? (meter.capturedImagePaths.first.startsWith('http')
                       ? DecorationImage(image: NetworkImage(meter.capturedImagePaths.first), fit: BoxFit.cover)
-                      : DecorationImage(image: FileImage(File(meter.capturedImagePaths.first)), fit: BoxFit.cover))
+                      : (kIsWeb 
+                          ? null // Cannot use FileImage on web with local paths
+                          : DecorationImage(image: FileImage(io.File(meter.capturedImagePaths.first)), fit: BoxFit.cover)))
                   : null,
             ),
             child: meter.capturedImagePaths.isEmpty 

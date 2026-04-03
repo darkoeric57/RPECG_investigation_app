@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart' as auth;
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
@@ -47,7 +48,7 @@ class GoogleDriveService {
   }
 
   Future<String?> uploadFile({
-    required File file,
+    required dynamic file,
     required String fileName,
   }) async {
     final scopes = [drive.DriveApi.driveFileScope];
@@ -69,7 +70,12 @@ class GoogleDriveService {
     if (extension == 'png') mimeType = 'image/png';
     if (extension == 'mp4') mimeType = 'video/mp4';
 
-    final media = drive.Media(file.openRead(), file.lengthSync(), contentType: mimeType);
+    if (kIsWeb) {
+       throw UnimplementedError('File upload via GoogleDriveService is not yet implemented for web.');
+    }
+
+    final io.File ioFile = file as io.File;
+    final media = drive.Media(ioFile.openRead(), ioFile.lengthSync(), contentType: mimeType);
     
     final driveFile = drive.File();
     driveFile.name = fileName;

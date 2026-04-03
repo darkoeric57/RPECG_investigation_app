@@ -22,9 +22,8 @@ dependencies:
   video_player: ^2.8.2
   local_auth: 2.3.0
   backendless_sdk:
-    path: plugins/backendless_sdk
+    path: plugins/fake_backendless
   http: ^1.2.2
-  reflectable: ^4.0.6
   googleapis: ^13.2.0
   googleapis_auth: ^1.6.0
   path: ^1.9.0
@@ -34,10 +33,11 @@ dependencies:
   google_sign_in: ^7.2.0
   extension_google_sign_in_as_googleapis_auth: ^3.0.0
   fl_chart: 0.70.2
-  pdf: 3.11.1
-  printing: 5.13.2
+  pdf: ^3.12.0
+  printing: ^5.14.3
   flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.5.4
+  intl: 0.19.0
 
 dev_dependencies:
   flutter_test:

@@ -127,391 +127,284 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isWide = MediaQuery.of(context).size.width > 900;
+    
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
-      appBar: AppBar(
-        title: const Column(
-          children: [
-            Text('Create Account'),
-            Text(
-              'Personal & Security Details',
-              style: TextStyle(fontSize: 10, color: AppTheme.textLight),
-            ),
-          ],
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Join Us',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const Text(
-                'Fill in your details to get started with your new account.',
-                style: TextStyle(fontSize: 14, color: AppTheme.textLight),
-              ),
-              const SizedBox(height: 24),
-
-              // Identity Section
-              _buildSectionHeader(Icons.person, 'Identity'),
-              const SizedBox(height: 16),
-              _buildCard([
-                CustomTextField(
-                  label: 'Full Name',
-                  hint: 'e.g. John Doe',
-                  controller: _nameController,
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter your full name' : null,
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: CustomTextField(
-                        label: 'Staff ID',
-                        hint: 'ID-0000',
-                        controller: _staffIdController,
-                        textCapitalization: TextCapitalization.none,
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildRegionSelector(),
-                    ),
-                  ],
-                ),
-              ]),
-              const SizedBox(height: 24),
-
-              // Administrative Details Section (Optional)
-              _buildSectionHeader(
-                Icons.admin_panel_settings,
-                'Administrative Details',
-              ),
-              const SizedBox(height: 16),
-              _buildCard([
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Field investigators only',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.primary.withValues(alpha: 0.6),
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  CustomTextField(
-                    label: 'Group No',
-                    hint: 'e.g. 101',
-                    keyboardType: TextInputType.number,
-                    controller: _groupNoController,
-                  ),
-                ],
-              ),
-                const SizedBox(height: 20),
-                _buildAccountTypeSelector(),
-              ]),
-              const SizedBox(height: 24),
-
-              // Contact Section
-              _buildSectionHeader(Icons.contact_mail, 'Contact Information'),
-              const SizedBox(height: 16),
-              _buildCard([
-                CustomTextField(
-                  label: 'Email Address',
-                  hint: 'Enter your email',
-                  prefixIcon: Icons.email_outlined,
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textCapitalization: TextCapitalization.none,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Email is required';
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return 'Enter a valid email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                CustomTextField(
-                  label: 'Phone Number',
-                  hint: '+233 ...',
-                  keyboardType: TextInputType.phone,
-                  controller: _phoneController,
-                  validator: (value) => value == null || value.isEmpty ? 'Phone number is required' : null,
-                ),
-              ]),
-              const SizedBox(height: 24),
-
-              // Security Section
-              _buildSectionHeader(Icons.security, 'Security'),
-              const SizedBox(height: 16),
-              _buildCard([
-                CustomTextField(
-                  label: 'Password',
-                  hint: 'Create a password',
-                  prefixIcon: Icons.lock_outline,
-                  obscureText: _obscurePassword,
-                  controller: _passwordController,
-                  textCapitalization: TextCapitalization.none,
-                  suffixIcon: _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  onSuffixTap: () => setState(() => _obscurePassword = !_obscurePassword),
-                  validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
-                ),
-                const SizedBox(height: 20),
-                CustomTextField(
-                  label: 'Confirm Password',
-                  hint: 'Repeat your password',
-                  prefixIcon: Icons.lock_outline,
-                  obscureText: _obscureConfirmPassword,
-                  controller: _confirmPasswordController,
-                  textCapitalization: TextCapitalization.none,
-                  suffixIcon: _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  onSuffixTap: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Confirm your password';
-                    if (value != _passwordController.text) return 'Passwords do not match';
-                    return null;
-                  },
-                ),
-              ]),
-              
-              const SizedBox(height: 24),
-              Center(
-                child: TextButton(
-                  onPressed: () => context.pop(),
-                  child: const Text.rich(
-                    TextSpan(
-                      text: 'Already have an account? ',
-                      style: TextStyle(color: AppTheme.textLight),
-                      children: [
-                        TextSpan(
-                          text: 'Sign in',
-                          style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 100), // Space for sticky bottom bar
-            ],
-          ),
-        ),
-      ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
-          border: const Border(top: BorderSide(color: AppTheme.borderLight)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: CustomButton(
-                text: 'CANCEL',
-                type: ButtonType.outlined,
-                onPressed: () => context.pop(),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 2,
-              child: CustomButton(
-                text: 'SIGN UP',
-                icon: Icons.arrow_forward,
-                type: ButtonType.accent,
-                onPressed: _handleSignup,
-              ),
-            ),
-          ],
-        ),
-      ),
+      backgroundColor: AppTheme.background,
+      body: isWide ? _buildWideLayout() : _buildNarrowLayout(),
     );
   }
 
-  Widget _buildSectionHeader(IconData icon, String title, {String? subtitle}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildWideLayout() {
+    return Row(
       children: [
-        Row(
-          children: [
-            Icon(icon, color: AppTheme.primary, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textDark),
-            ),
-          ],
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 28),
-            child: Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppTheme.primary.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w500,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildCard(List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: AppTheme.borderLight.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-  }
-
-  Widget _buildRegionSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'REGION',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textLight,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-        InkWell(
-          onTap: _showRegionPicker,
-          borderRadius: BorderRadius.circular(16),
+        // Visual Column (Left)
+        Expanded(
           child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.borderLight),
-            ),
-            child: Row(
+            color: AppTheme.primary,
+            child: Stack(
               children: [
-                Expanded(
-                  child: Text(
-                    _selectedRegion,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textDark),
-                    overflow: TextOverflow.ellipsis,
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.4,
+                    child: Image.network(
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCnEW7l9uEaphex3olCtGrPGkyu5NGL8J_us65nf1wmUT1MsxLaFnDI-w_g9eUwHvCwrACZNj-MGQuhC1pLmH8TwzqjvCBA2SHLf6jt3clXJOl9BeimTdheChQHTHLkcbdefpcKCJQWmIUJf3nI38FdR-XUgjr7LKk04i4KAJjZXLoNh9M97AtWo__FNONo-4T-P4BAf5vcPnjfi570tANwOo_9MRmmHMQMJ6J_5YtUvcJjImfAc7ql6sde5vQskPHmvGp3FZhh6Ro',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(color: AppTheme.primary),
+                    ),
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down, color: AppTheme.textLight),
+                Padding(
+                  padding: const EdgeInsets.all(64),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Powering the Future of Utility Management.',
+                        style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                          color: Colors.white,
+                          fontSize: 48,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Sovereign Utility provides back-office staff with precision tools for investigation, reporting, and real-time asset monitoring.',
+                        style: TextStyle(color: Colors.white70, fontSize: 18),
+                      ),
+                      const SizedBox(height: 48),
+                      Row(
+                        children: [
+                          _buildFeatureCard(Icons.analytics, 'Advanced Analytics', 'Real-time data processing.'),
+                          const SizedBox(width: 24),
+                          _buildFeatureCard(Icons.verified_user, 'Secure Access', 'Enterprise-grade security.'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildAccountTypeSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            'ACCOUNT TYPE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textLight,
-              letterSpacing: 1.2,
+        // Form Column (Right)
+        Expanded(
+          child: Container(
+            color: AppTheme.surfaceContainerLowest,
+            padding: const EdgeInsets.symmetric(horizontal: 80),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 450),
+                child: _buildSignupForm(),
+              ),
             ),
           ),
         ),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderLight),
-          ),
-          child: Row(
-            children: [
-              _buildTypeOption('Technical', Icons.settings_suggest_outlined),
-              _buildTypeOption('Commercial', Icons.business_outlined),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildTypeOption(String type, IconData icon) {
-    final isSelected = _accountType == type;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _accountType = type),
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildNarrowLayout() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: _buildSignupForm(),
+    );
+  }
+
+  Widget _buildSignupForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? Colors.white : AppTheme.textLight,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                type,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : AppTheme.textLight,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: const Icon(Icons.admin_panel_settings, color: AppTheme.secondary),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Sovereign Utility',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppTheme.primary),
               ),
             ],
           ),
+          const SizedBox(height: 32),
+          Text(
+            'Staff Registration',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          const Text('Create your back-office investigator account.'),
+        const SizedBox(height: 48),
+        
+        _buildInputLabel('Full Name'),
+        CustomTextField(
+          label: '',
+          showLabel: false,
+          hint: 'Enter your full name',
+          prefixIcon: Icons.person_outline,
+          controller: _nameController,
+          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+        ),
+        const SizedBox(height: 24),
+        
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInputLabel('Staff ID'),
+                  CustomTextField(
+                    label: '',
+                    showLabel: false,
+                    hint: 'ID-0000',
+                    controller: _staffIdController,
+                    validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInputLabel('Region'),
+                  Container(
+                    height: 56,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedRegion,
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textLight, size: 20),
+                        style: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                        ),
+                        items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                        onChanged: (v) => setState(() => _selectedRegion = v!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+        _buildInputLabel('Email Address'),
+        CustomTextField(
+          label: '',
+          showLabel: false,
+          hint: 'work@sovereign-utility.com',
+          prefixIcon: Icons.mail_outline,
+          controller: _emailController,
+          validator: (value) => value == null || !value.contains('@') ? 'Invalid email' : null,
+        ),
+        const SizedBox(height: 24),
+        
+        _buildInputLabel('Password'),
+        CustomTextField(
+          label: '',
+          showLabel: false,
+          hint: '••••••••••••',
+          prefixIcon: Icons.lock_outline,
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          suffixIcon: _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          onSuffixTap: () => setState(() => _obscurePassword = !_obscurePassword),
+          validator: (value) => value == null || value.length < 6 ? 'Too short' : null,
+        ),
+        const SizedBox(height: 48),
+        
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: ElevatedButton(
+            onPressed: _handleSignup,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              shape: const StadiumBorder(),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Register', style: TextStyle(fontSize: 16)),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward, size: 20),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        Center(
+          child: TextButton(
+            onPressed: () => context.pop(),
+            child: const Text(
+              'Already have an account? Sign In',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        ],
+      ),
+    );
+  }
+
+Widget _buildInputLabel(String label) {
+  return Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 10),
+    child: Text(
+      label.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.5,
+        color: Color(0xFF444651),
+      ),
+    ),
+  );
+}
+
+  Widget _buildFeatureCard(IconData icon, String title, String desc) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: AppTheme.secondary),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          ],
         ),
       ),
     );
@@ -552,7 +445,7 @@ class _SignupScreenState extends State<SignupScreen> {
         Navigator.pop(context); // Remove loading
         String message = e.toString();
         if (e is BackendlessException) {
-          message = e.message;
+          message = e.message ?? 'Unknown error';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Signup failed: $message'), backgroundColor: Colors.redAccent),

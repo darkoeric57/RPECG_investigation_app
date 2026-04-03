@@ -5,6 +5,7 @@ class AppConfig {
 
   // Backendless Configuration
   static const String backendlessApplicationId = '8ADEB922-FBDE-4DF0-8B4B-01090D72F1C9';
-  static const String backendlessAndroidApiKey = '2799670C-1A7F-4535-91EB-67B173E1D638';
-  static const String backendlessIosApiKey = '31E00CDC-AE64-494E-A108-16CB4889ED51';
+  static const String backendlessAndroidApiKey = '9B648E1D-5CA4-4EC8-A676-0E128B0AB2F5';
+  static const String backendlessIosApiKey = '9B648E1D-5CA4-4EC8-A676-0E128B0AB2F5';
+  static const String backendlessJsApiKey = '9B648E1D-5CA4-4EC8-A676-0E128B0AB2F5';
 }

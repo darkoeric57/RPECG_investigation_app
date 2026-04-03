@@ -1,5 +1,6 @@
 import 'package:backendless_sdk/backendless_sdk.dart';
 import '../../features/meters/domain/meter.dart';
+import '../../features/dashboard/domain/investigator.dart';
 
 class BackendlessDataService {
   static final BackendlessDataService _instance = BackendlessDataService._internal();
@@ -7,10 +8,11 @@ class BackendlessDataService {
   BackendlessDataService._internal();
 
   static const String metersTable = 'Meters';
+  static const String investigatorsTable = 'Investigators';
 
   Future<void> saveMeter(Meter meter) async {
     try {
-      final Map<dynamic, dynamic> data = {
+      final Map<String, dynamic> data = {
         'meterId': meter.id,
         'customerName': meter.customerName,
         'address': meter.address,
@@ -42,6 +44,16 @@ class BackendlessDataService {
       final result = await Backendless.data.of(metersTable).find();
       if (result == null) return [];
       return result.map((m) => Meter.fromMap(m!)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<Investigator>> getInvestigators() async {
+    try {
+      final result = await Backendless.data.of(investigatorsTable).find();
+      if (result == null) return [];
+      return result.map((i) => Investigator.fromMap(i!)).toList();
     } catch (e) {
       return [];
     }

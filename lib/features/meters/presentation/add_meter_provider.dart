@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:io' as io;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/device_service.dart';
 import '../../../core/providers.dart';
@@ -365,7 +365,7 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
       for (var i = 0; i < state.capturedImagePaths.length; i++) {
         final path = state.capturedImagePaths[i];
         final url = await driveService.uploadFile(
-          file: File(path),
+          file: io.File(path),
           fileName: 'meter_${state.meterId}_img_$i.jpg',
         );
         if (url != null) {
@@ -376,7 +376,7 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
       // 2. Upload captured video if available
       if (state.capturedVideoPath != null) {
         videoUrl = await driveService.uploadFile(
-          file: File(state.capturedVideoPath!),
+          file: io.File(state.capturedVideoPath!),
           fileName: 'meter_${state.meterId}_video.mp4',
         );
       }

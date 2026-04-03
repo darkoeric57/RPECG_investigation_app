@@ -1,11 +1,14 @@
+import 'dart:convert' show utf8;
+import 'dart:typed_data' show Uint8List;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers.dart';
 import '../domain/meter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import '../../../core/services/pdf_service.dart';
 
 class MeterDetailsScreen extends ConsumerWidget {
@@ -15,10 +18,20 @@ class MeterDetailsScreen extends ConsumerWidget {
 
   Future<void> _shareMeter(Meter meter) async {
     final csv = 'Meter ID,Customer Name,Address,Status\n${meter.id},"${meter.customerName}","${meter.address}",${meter.status.name}';
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/meter_${meter.id}.csv');
-    await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)], text: 'Installation Record: ${meter.id}');
+    
+    if (kIsWeb) {
+      // On web, we use XFile.fromData to avoid path_provider
+      final bytes = utf8.encode(csv);
+      await Share.shareXFiles(
+        [XFile.fromData(Uint8List.fromList(bytes), name: 'meter_${meter.id}.csv', mimeType: 'text/csv')],
+        text: 'Installation Record: ${meter.id}',
+      );
+    } else {
+      final tempDir = await getTemporaryDirectory();
+      final file = io.File('${tempDir.path}/meter_${meter.id}.csv');
+      await file.writeAsString(csv);
+      await Share.shareXFiles([XFile(file.path)], text: 'Installation Record: ${meter.id}');
+    }
   }
 
   @override

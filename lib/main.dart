@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/routes/app_router.dart';
+import 'features/backoffice/core/backoffice_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -9,24 +10,35 @@ import 'features/dashboard/domain/investigator.dart';
 import 'package:backendless_sdk/backendless_sdk.dart';
 import 'core/config/app_config.dart';
 import 'core/services/backendless_auth_service.dart';
-import 'main.reflectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// import 'main.reflectable.dart';
+import 'package:google_sign_in/google_sign_in.dart' as gsi;
+import 'core/utils/web_utils.dart';
 
-import 'package:google_sign_in/google_sign_in.dart' as auth;
+// Google Sign In configuration
+final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  initializeReflectable();
-  // Initialize Google Sign-In (Required by v7.2.0)
+  // initializeReflectable();
+  
+  debugPrint('BACKENDLESS_AUTH_DEBUG: main() started');
+
+  // Initialize Google Sign In
   try {
-    await auth.GoogleSignIn.instance.initialize(
-      serverClientId: AppConfig.googleServerClientId, // Centralized Client ID
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Initializing Google Sign-In');
+    await _googleSignIn.initialize(
+      clientId: kIsWeb ? AppConfig.googleServerClientId : null,
+      serverClientId: !kIsWeb ? AppConfig.googleServerClientId : null,
     );
-  } catch (e) {
-    debugPrint('Google Sign-In initialization failed: $e');
+    await _googleSignIn.attemptLightweightAuthentication();
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Google Sign-In initialization and silent sign-in attempted');
+  } catch (e, stack) {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Google Sign-In initialization failed: $e');
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Stack trace: $stack');
   }
 
   await Hive.initFlutter();
+  debugPrint('BACKENDLESS_AUTH_DEBUG: Hive initialized');
   
   // Startup Diagnostic
   try {
@@ -38,11 +50,20 @@ void main() async {
   }
   
   // Initialize Backendless
-  await Backendless.initApp(
-    applicationId: AppConfig.backendlessApplicationId,
-    iosApiKey: AppConfig.backendlessIosApiKey,
-    androidApiKey: AppConfig.backendlessAndroidApiKey,
-  );
+  debugPrint('BACKENDLESS_AUTH_DEBUG: Initializing Backendless');
+  try {
+    await Backendless.initApp(
+      applicationId: AppConfig.backendlessApplicationId,
+      iosApiKey: AppConfig.backendlessIosApiKey,
+      androidApiKey: AppConfig.backendlessAndroidApiKey,
+      jsApiKey: AppConfig.backendlessJsApiKey,
+    );
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Backendless initialized successfully');
+  } catch (e) {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: ERROR: Backendless initialization failed: $e');
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Switching to MOCK AUTH MODE due to initialization failure.');
+    BackendlessAuthService.useMock = true;
+  }
   
   // Register Adapters
   Hive.registerAdapter(MeterStatusAdapter());
@@ -57,25 +78,35 @@ void main() async {
   await Hive.openBox('settings');
   await Hive.openBox<Meter>('meters_box');
   await Hive.openBox<Investigator>('investigators_box');
+  debugPrint('BACKENDLESS_AUTH_DEBUG: Hive boxes opened');
 
   // Pre-load user session if it exists
   final container = ProviderContainer();
   final authService = BackendlessAuthService();
   try {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Checking for valid login');
     if (await authService.isValidLogin()) {
+      debugPrint('BACKENDLESS_AUTH_DEBUG: Valid login found, fetching current user');
       final user = await authService.getCurrentUser();
       container.read(userProvider.notifier).state = user;
+      debugPrint('BACKENDLESS_AUTH_DEBUG: User session restored: ${user?.email}');
+    } else {
+      debugPrint('BACKENDLESS_AUTH_DEBUG: No valid session found');
     }
-  } catch (_) {
-    // Ignore errors during pre-load
+  } catch (e) {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Auth check failed: $e');
   }
 
+  debugPrint('BACKENDLESS_AUTH_DEBUG: Ready to run app, removing loading spinner');
+  removeLoadingSpinner();
+  
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const UtilityApp(),
     ),
   );
+  debugPrint('BACKENDLESS_AUTH_DEBUG: runApp() executed');
 }
 
 class UtilityApp extends ConsumerWidget {
@@ -84,6 +115,7 @@ class UtilityApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'Utility Manager',
@@ -91,7 +123,7 @@ class UtilityApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
-      routerConfig: AppRouter.router,
+      routerConfig: router,
     );
   }
 }

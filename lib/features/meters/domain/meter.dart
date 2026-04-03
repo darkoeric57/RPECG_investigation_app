@@ -123,23 +123,36 @@ class Meter {
 
   factory Meter.fromMap(Map<dynamic, dynamic> map) {
     return Meter(
-      id: map['meterId'] as String,
-      customerName: map['customerName'] as String,
-      address: map['address'] as String,
-      telephone: map['telephone'] as String,
-      tariffClass: map['tariffClass'] as String,
-      gpsCoordinates: map['gpsCoordinates'] as String,
-      tariffActivity: TariffActivity.values.byName(map['tariffActivity'] as String),
-      geocode: map['geocode'] as String,
-      spnNumber: map['spnNumber'] as String,
-      brand: map['brand'] as String,
-      rating: map['rating'] as String,
-      phase: MeterPhase.values.byName(map['phase'] as String),
-      type: MeteringType.values.byName(map['type'] as String),
-      status: MeterStatus.values.byName(map['status'] as String),
-      installationDate: DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int),
-      initialReadings: map['initialReadings'] as String? ?? '',
-      capturedImagePaths: map['capturedImagePaths'] != null ? List<String>.from(map['capturedImagePaths'] as List) : const [],
+      id: (map['meterId'] ?? map['objectId'] ?? '') as String,
+      customerName: (map['customerName'] ?? 'Unknown Customer') as String,
+      address: (map['address'] ?? 'No Address Provided') as String,
+      telephone: (map['telephone'] ?? '') as String,
+      tariffClass: (map['tariffClass'] ?? '') as String,
+      gpsCoordinates: (map['gpsCoordinates'] ?? '') as String,
+      tariffActivity: map['tariffActivity'] != null 
+          ? TariffActivity.values.byName(map['tariffActivity'] as String)
+          : TariffActivity.residential,
+      geocode: (map['geocode'] ?? '') as String,
+      spnNumber: (map['spnNumber'] ?? '') as String,
+      brand: (map['brand'] ?? '') as String,
+      rating: (map['rating'] ?? '') as String,
+      phase: map['phase'] != null 
+          ? MeterPhase.values.byName(map['phase'] as String)
+          : MeterPhase.single,
+      type: map['type'] != null 
+          ? MeteringType.values.byName(map['type'] as String)
+          : MeteringType.prepaid,
+      status: map['status'] != null 
+          ? MeterStatus.values.byName(map['status'] as String)
+          : MeterStatus.active,
+      installationDate: map['installationDate'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int)
+          : DateTime.now(),
+      findings: (map['findings'] ?? '') as String,
+      initialReadings: (map['initialReadings'] ?? '') as String,
+      capturedImagePaths: map['capturedImagePaths'] != null 
+          ? List<String>.from(map['capturedImagePaths'] as Iterable) 
+          : const [],
       capturedVideoPath: map['capturedVideoPath'] as String?,
       isSynced: true,
     );

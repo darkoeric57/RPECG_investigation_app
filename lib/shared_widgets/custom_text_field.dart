@@ -17,6 +17,7 @@ class CustomTextField extends StatelessWidget {
   final int? maxLines;
   final bool autoFocus;
   final TextCapitalization textCapitalization;
+  final bool showLabel;
 
   const CustomTextField({
     super.key,
@@ -35,6 +36,7 @@ class CustomTextField extends StatelessWidget {
     this.maxLines = 1,
     this.autoFocus = false,
     this.textCapitalization = TextCapitalization.words,
+    this.showLabel = true,
   });
 
   @override
@@ -42,18 +44,19 @@ class CustomTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textLight,
-              letterSpacing: 1.2,
+        if (showLabel)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textLight,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
-        ),
         TextFormField(
           controller: controller,
           initialValue: initialValue,
@@ -67,25 +70,32 @@ class CustomTextField extends StatelessWidget {
             onChanged?.call(val);
           },
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w500,
-            color: AppTheme.textDark,
+            color: Color(0xFF1E293B),
+            height: 1.2, // Force consistent line height
           ),
           decoration: InputDecoration(
+            isDense: true, // Use isDense to have more control over padding
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
             hintText: hint,
-            hintStyle: const TextStyle(color: AppTheme.textLight, fontWeight: FontWeight.normal),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+            hintStyle: TextStyle(
+              color: AppTheme.textLight.withValues(alpha: 0.6), 
+              fontWeight: FontWeight.normal,
+              fontSize: 15,
+            ),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppTheme.textLight, size: 20) : null,
             suffixIcon: isLoading 
                 ? const UnconstrainedBox(
                     child: SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
                 : (suffixIcon != null
                     ? IconButton(
-                        icon: Icon(suffixIcon),
+                        icon: Icon(suffixIcon, color: AppTheme.textLight, size: 20),
                         onPressed: onSuffixTap,
                       )
                     : null),

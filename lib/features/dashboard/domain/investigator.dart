@@ -23,4 +23,14 @@ class Investigator {
     required this.imageUrl,
     required this.status,
   });
+
+  factory Investigator.fromMap(Map<dynamic, dynamic> map) {
+    return Investigator(
+      id: map['objectId'] as String,
+      name: map['name'] as String,
+      location: map['location'] as String? ?? 'Unknown',
+      imageUrl: map['imageUrl'] as String? ?? '',
+      status: InvestigatorStatus.values.byName(map['status'] as String? ?? 'offline'),
+    );
+  }
 }

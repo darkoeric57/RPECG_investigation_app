@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -10,11 +11,13 @@ class PdfService {
 
     // Load images if available
     final List<pw.MemoryImage> imageWidgets = [];
-    for (var path in meter.capturedImagePaths) {
-      final file = File(path);
-      if (await file.exists()) {
-        final bytes = await file.readAsBytes();
-        imageWidgets.add(pw.MemoryImage(bytes));
+    if (!kIsWeb) {
+      for (var path in meter.capturedImagePaths) {
+        final file = io.File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          imageWidgets.add(pw.MemoryImage(bytes));
+        }
       }
     }
 
