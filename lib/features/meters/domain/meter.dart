@@ -4,9 +4,10 @@ part 'meter.g.dart';
 
 @HiveType(typeId: 0)
 enum MeterStatus { 
-  @HiveField(0) active, 
+  @HiveField(0) paid, 
   @HiveField(1) pending, 
-  @HiveField(2) faulty 
+  @HiveField(2) billed,
+  @HiveField(3) scheduled
 }
 
 @HiveType(typeId: 1)
@@ -68,12 +69,18 @@ class Meter {
     this.isSynced = false,
     this.capturedImagePaths = const [],
     this.capturedVideoPath,
+    this.debtAmount = 0.0,
+    this.offenseType = '',
+    this.dateApprehended,
   });
 
   @HiveField(16) final String findings;
   @HiveField(17) final String initialReadings;
   @HiveField(18) final List<String> capturedImagePaths;
   @HiveField(19) final String? capturedVideoPath;
+  @HiveField(20) final double debtAmount;
+  @HiveField(21) final String offenseType;
+  @HiveField(22) final DateTime? dateApprehended;
 
   Meter copyWith({
     String? id,
@@ -96,6 +103,9 @@ class Meter {
     List<String>? capturedImagePaths,
     String? capturedVideoPath,
     bool? isSynced,
+    double? debtAmount,
+    String? offenseType,
+    DateTime? dateApprehended,
   }) {
     return Meter(
       id: id ?? this.id,
@@ -118,6 +128,9 @@ class Meter {
       capturedImagePaths: capturedImagePaths ?? this.capturedImagePaths,
       capturedVideoPath: capturedVideoPath ?? this.capturedVideoPath,
       isSynced: isSynced ?? this.isSynced,
+      debtAmount: debtAmount ?? this.debtAmount,
+      offenseType: offenseType ?? this.offenseType,
+      dateApprehended: dateApprehended ?? this.dateApprehended,
     );
   }
 
@@ -143,8 +156,8 @@ class Meter {
           ? MeteringType.values.byName(map['type'] as String)
           : MeteringType.prepaid,
       status: map['status'] != null 
-          ? MeterStatus.values.byName(map['status'] as String)
-          : MeterStatus.active,
+          ? _mapStatus(map['status'] as String)
+          : MeterStatus.paid,
       installationDate: map['installationDate'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int)
           : DateTime.now(),
@@ -155,6 +168,26 @@ class Meter {
           : const [],
       capturedVideoPath: map['capturedVideoPath'] as String?,
       isSynced: true,
+      debtAmount: (map['debtAmount'] ?? 0.0) as double,
+      offenseType: (map['offenseType'] ?? '') as String,
+      dateApprehended: map['dateApprehended'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['dateApprehended'] as int)
+          : null,
     );
+  }
+
+  static MeterStatus _mapStatus(String statusStr) {
+    final s = statusStr.toLowerCase();
+    if (s == 'active' || s == 'operational') return MeterStatus.paid;
+    if (s == 'faulty' || s == 'critical failure' || s == 'critical') return MeterStatus.billed;
+    if (s == 'pending' || s == 'low throughput') return MeterStatus.pending;
+    if (s == 'scheduled' || s == 'billed' || s == 'paid') {
+      try {
+        return MeterStatus.values.byName(s);
+      } catch (_) {
+        return MeterStatus.paid;
+      }
+    }
+    return MeterStatus.paid;
   }
 }

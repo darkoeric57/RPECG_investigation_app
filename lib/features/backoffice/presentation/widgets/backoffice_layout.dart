@@ -13,6 +13,7 @@ import '../pages/notifications_chat_page.dart';
 import '../pages/map_view_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/billing_dashboard_page.dart';
+import '../pages/meter_details_summary_page.dart';
 
 class BackofficeLayout extends ConsumerWidget {
   const BackofficeLayout({super.key});
@@ -70,6 +71,8 @@ class BackofficeLayout extends ConsumerWidget {
           return const SettingsPage();
         case BackofficePage.billingDashboard:
           return const BillingDashboardPage();
+        case BackofficePage.meterDetails:
+          return const MeterDetailsSummaryPage();
       }
     } catch (e) {
       return Center(

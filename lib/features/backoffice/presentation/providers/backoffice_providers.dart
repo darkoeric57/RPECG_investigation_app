@@ -14,6 +14,7 @@ enum BackofficePage {
   mapView,
   settings,
   billingDashboard,
+  meterDetails,
 }
 
 final backofficePageProvider =
@@ -21,175 +22,13 @@ final backofficePageProvider =
 
 final isSidebarCollapsedProvider = StateProvider<bool>((ref) => false);
 
+final selectedMeterProvider = StateProvider<Meter?>((ref) => null);
+
 // ─── Meters ───────────────────────────────────────────────────────────────────
 
 final backofficeMetersProvider = FutureProvider<List<Meter>>((ref) async {
   final dataService = BackendlessDataService();
-  final remoteMeters = await dataService.getRemoteMeters();
-  
-  // High-fidelity mock reports for the demo
-  final mockReports = [
-    Meter(
-      id: 'MET-7829-X',
-      customerName: 'Amina Okoro',
-      address: '12 Crescent Way, Victoria Island',
-      telephone: '+234 801 234 5678',
-      tariffClass: 'Residential R2',
-      gpsCoordinates: '6.4253° N, 3.4419° E',
-      tariffActivity: TariffActivity.residential,
-      geocode: 'VI-04',
-      spnNumber: 'SPN-8821',
-      brand: 'L&G',
-      rating: '10(60)A',
-      phase: MeterPhase.single,
-      type: MeteringType.prepaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2022, 5, 15),
-      findings: 'Meter bypass detected. Terminal seal broken and bridge wire discovered across internal shunt.',
-      capturedImagePaths: [
-        'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=600',
-        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600'
-      ],
-    ),
-    Meter(
-      id: 'MET-4412-B',
-      customerName: 'Chidi Azikiwe',
-      address: 'Plot 45, Lekki Phase 1',
-      telephone: '+234 802 345 6789',
-      tariffClass: 'Commercial C1',
-      gpsCoordinates: '6.4483° N, 3.4736° E',
-      tariffActivity: TariffActivity.commercial,
-      geocode: 'LK-02',
-      spnNumber: 'SPN-9904',
-      brand: 'EDMI',
-      rating: '20(100)A',
-      phase: MeterPhase.three,
-      type: MeteringType.postpaid,
-      status: MeterStatus.active,
-      installationDate: DateTime(2021, 11, 20),
-      findings: 'Suspicious tampering with optical port. Casing shows heat damage consistent with unauthorized access attempts.',
-      capturedImagePaths: [
-        'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=600'
-      ],
-      capturedVideoPath: 'mock_video_path.mp4',
-    ),
-    Meter(
-      id: 'MET-9905-Z',
-      customerName: 'Olu Jacobs',
-      address: 'Avenue 7, Ikoyi',
-      telephone: '+234 803 456 7890',
-      tariffClass: 'Industrial I1',
-      gpsCoordinates: '6.4550° N, 3.4350° E',
-      tariffActivity: TariffActivity.industrial,
-      geocode: 'IK-05',
-      spnNumber: 'SPN-7712',
-      brand: 'ABB',
-      rating: '50(150)A',
-      phase: MeterPhase.three,
-      type: MeteringType.postpaid,
-      status: MeterStatus.active,
-      installationDate: DateTime(2023, 1, 10),
-      findings: 'Magnetic interference detected. Traces of high-powered magnets found near the induction coil area.',
-      capturedImagePaths: [],
-    ),
-    Meter(
-      id: 'MET-1022-F',
-      customerName: 'Sarah Boateng',
-      address: '34 Osu Badu St, Dzorwulu',
-      telephone: '+233 244 123 456',
-      tariffClass: 'Residential R1',
-      gpsCoordinates: '5.6171° N, 0.1947° W',
-      tariffActivity: TariffActivity.residential,
-      geocode: 'DZ-01',
-      spnNumber: 'SPN-1022',
-      brand: 'Itell',
-      rating: '5(60)A',
-      phase: MeterPhase.single,
-      type: MeteringType.prepaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2020, 3, 12),
-      findings: 'Tampered Meter: Evidence of physical breach on the enclosure seal.',
-      capturedImagePaths: [],
-    ),
-    Meter(
-      id: 'MET-5541-G',
-      customerName: 'Kofi Mensah',
-      address: 'Spintex Road, Accra',
-      telephone: '+233 551 987 654',
-      tariffClass: 'Commercial C2',
-      gpsCoordinates: '5.6258° N, 0.1124° W',
-      tariffActivity: TariffActivity.commercial,
-      geocode: 'SP-05',
-      spnNumber: 'SPN-5541',
-      brand: 'Conlog',
-      rating: '20(100)A',
-      phase: MeterPhase.single,
-      type: MeteringType.prepaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2021, 8, 22),
-      findings: 'Relay Not Tripping: Remote disconnect command received but relay remained in closed state.',
-      capturedImagePaths: [],
-    ),
-    Meter(
-      id: 'MET-2022-H',
-      customerName: 'Edward Mensah',
-      address: 'Lartebiokorshie, Accra',
-      telephone: '+233 201 111 222',
-      tariffClass: 'Residential R1',
-      gpsCoordinates: '5.5501° N, 0.2201° W',
-      tariffActivity: TariffActivity.residential,
-      geocode: 'LB-01',
-      spnNumber: 'SPN-2022',
-      brand: 'Itron',
-      rating: '10(60)A',
-      phase: MeterPhase.single,
-      type: MeteringType.prepaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2022, 1, 15),
-      findings: 'Communication Error: Signal strength at -110dBm. Concentrator unable to fetch daily consumption data.',
-      capturedImagePaths: [],
-    ),
-    Meter(
-      id: 'MET-3304-J',
-      customerName: 'Joyce Appiah',
-      address: 'Tema Community 5',
-      telephone: '+233 544 333 444',
-      tariffClass: 'Residential R2',
-      gpsCoordinates: '5.6701° N, 0.0101° E',
-      tariffActivity: TariffActivity.residential,
-      geocode: 'TM-05',
-      spnNumber: 'SPN-3304',
-      brand: 'EDMI',
-      rating: '15(60)A',
-      phase: MeterPhase.single,
-      type: MeteringType.prepaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2023, 6, 20),
-      findings: 'Burnt Meter: Severe heat damage on the terminal cover and phase bridge.',
-      capturedImagePaths: [],
-    ),
-    Meter(
-      id: 'MET-9981-K',
-      customerName: 'Daniel Osei',
-      address: 'Kumasi, Adum',
-      telephone: '+233 245 444 555',
-      tariffClass: 'Commercial C1',
-      gpsCoordinates: '6.6885° N, 1.6244° W',
-      tariffActivity: TariffActivity.commercial,
-      geocode: 'KS-02',
-      spnNumber: 'SPN-9981',
-      brand: 'L&G',
-      rating: '20(100)A',
-      phase: MeterPhase.three,
-      type: MeteringType.postpaid,
-      status: MeterStatus.faulty,
-      installationDate: DateTime(2022, 12, 10),
-      findings: 'Communication Error: PLC noise level too high for data packet delivery.',
-      capturedImagePaths: [],
-    ),
-  ];
-
-  return [...remoteMeters, ...mockReports];
+  return await dataService.getRemoteMeters();
 });
 
 final meterSearchQueryProvider = StateProvider<String>((ref) => '');
@@ -244,7 +83,7 @@ final faultyMetersCountProvider = Provider.family<int, String>((ref, category) {
   final metersAsync = ref.watch(backofficeMetersProvider);
   return metersAsync.maybeWhen(
     data: (meters) {
-      final faultyMeters = meters.where((m) => m.status == MeterStatus.faulty).toList();
+      final faultyMeters = meters.where((m) => m.status == MeterStatus.billed).toList();
       
       int countFor(String cat) {
         return faultyMeters.where((m) {
@@ -284,6 +123,75 @@ final backofficeInvestigatorsProvider =
     FutureProvider<List<Investigator>>((ref) async {
   final dataService = BackendlessDataService();
   return dataService.getInvestigators();
+});
+
+// ─── Dashboard Specific Providers ─────────────────────────────────────────────
+
+final totalMetersCountProvider = Provider<String>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) => meters.length.toString(),
+    orElse: () => '0',
+  );
+});
+
+final pendingReportsCountProvider = Provider<String>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) => meters.where((m) => m.status == MeterStatus.pending).length.toString(),
+    orElse: () => '0',
+  );
+});
+
+final activeInvestigatorsCountProvider = Provider<String>((ref) {
+  final investigatorsAsync = ref.watch(backofficeInvestigatorsProvider);
+  return investigatorsAsync.maybeWhen(
+    data: (investigators) => investigators.length.toString(),
+    orElse: () => '0',
+  );
+});
+
+final meterActivityByDayProvider = Provider<List<double>>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) {
+      final counts = List.filled(7, 0.0);
+      for (var m in meters) {
+        // weekday: 1 (Mon) to 7 (Sun)
+        final day = m.installationDate.weekday - 1;
+        if (day >= 0 && day < 7) counts[day] += 1;
+      }
+      return counts;
+    },
+    orElse: () => List.filled(7, 0.0),
+  );
+});
+
+final recentMetersProvider = Provider<List<Meter>>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) {
+      final sorted = List<Meter>.from(meters)
+        ..sort((a, b) => b.installationDate.compareTo(a.installationDate));
+      return sorted.take(5).toList();
+    },
+    orElse: () => [],
+  );
+});
+
+final totalPaymentReportProvider = Provider<String>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) {
+      // Logic: GHS 200 per meter + base 12.4k for existing reporting
+      final totalValue = 12400 + (meters.length * 200.0);
+      if (totalValue >= 1000) {
+        return 'GHS ${(totalValue / 1000).toStringAsFixed(1)}k';
+      }
+      return 'GHS ${totalValue.toStringAsFixed(0)}';
+    },
+    orElse: () => 'GHS 0k',
+  );
 });
 
 final selectedInvestigatorIdProvider = StateProvider<String?>((ref) => null);

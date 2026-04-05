@@ -118,9 +118,18 @@ class MeterDetailsScreen extends ConsumerWidget {
   Widget _buildStatusHeader(Meter meter) {
     Color statusColor;
     switch (meter.status) {
-      case MeterStatus.active: statusColor = Colors.green; break;
-      case MeterStatus.pending: statusColor = Colors.orange; break;
-      case MeterStatus.faulty: statusColor = Colors.red; break;
+      case MeterStatus.paid:
+        statusColor = const Color(0xFF10B981); // Emerald
+        break;
+      case MeterStatus.pending:
+        statusColor = const Color(0xFFF59E0B); // Amber
+        break;
+      case MeterStatus.billed:
+        statusColor = const Color(0xFF6366F1); // Indigo
+        break;
+      case MeterStatus.scheduled:
+        statusColor = const Color(0xFFA855F7); // Purple
+        break;
     }
 
     return Container(

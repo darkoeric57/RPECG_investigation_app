@@ -35,7 +35,7 @@ final metersProvider = FutureProvider<List<Meter>>((ref) async {
 });
 
 // Search Logic
-enum SearchStatus { all, active, pending, faulty }
+enum SearchStatus { all, paid, pending, billed, scheduled }
 
 class SearchFilters {
   final String query;

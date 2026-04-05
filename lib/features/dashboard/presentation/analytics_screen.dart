@@ -223,7 +223,7 @@ class AnalyticsScreen extends ConsumerWidget {
           barGroups: MeterStatus.values.asMap().entries.map((e) {
             final status = e.value;
             final count = stats[status] ?? 0;
-            final color = status == MeterStatus.active ? Colors.green : status == MeterStatus.pending ? Colors.orange : Colors.red;
+            final color = status == MeterStatus.paid ? Colors.green : status == MeterStatus.pending ? Colors.orange : Colors.red;
             return BarChartGroupData(
               x: e.key,
               barRods: [

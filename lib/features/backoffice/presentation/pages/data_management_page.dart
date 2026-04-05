@@ -5,6 +5,7 @@ import '../providers/backoffice_providers.dart';
 import '../../../../features/meters/domain/meter.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/web_utils.dart';
+import '../widgets/refresh_sync_button.dart';
 
 class DataManagementPage extends ConsumerWidget {
   const DataManagementPage({super.key});
@@ -129,12 +130,15 @@ class DataManagementPage extends ConsumerWidget {
     final statusFilter = ref.watch(meterStatusFilterProvider);
     final isLoading = metersAsync is AsyncLoading;
 
-    final statusOptions = <String, MeterStatus?>{
-      'All Statuses': null,
-      'Operational': MeterStatus.active,
-      'Low Throughput': MeterStatus.pending,
-      'Critical Failure': MeterStatus.faulty,
+    final statusOptions = <String, dynamic>{
+      'All Status': 'all',
+      'Paid': MeterStatus.paid,
+      'Pending': MeterStatus.pending,
+      'Billed': MeterStatus.billed,
+      'Scheduled': MeterStatus.scheduled,
     };
+
+    final hasActiveFilter = statusFilter != null;
 
     return Row(
       children: [
@@ -142,10 +146,37 @@ class DataManagementPage extends ConsumerWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
+            Row(
+              children: [
+                const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                if (hasActiveFilter) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => ref.read(meterStatusFilterProvider.notifier).state = null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'CLEAR',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             const SizedBox(height: 8),
-            PopupMenuButton<MeterStatus?>(
-              onSelected: (val) => ref.read(meterStatusFilterProvider.notifier).state = val,
+            PopupMenuButton<dynamic>(
+              onSelected: (val) {
+                if (val == 'all') {
+                  ref.read(meterStatusFilterProvider.notifier).state = null;
+                } else {
+                  ref.read(meterStatusFilterProvider.notifier).state = val as MeterStatus;
+                }
+              },
               itemBuilder: (_) => statusOptions.entries
                   .map((e) => PopupMenuItem(value: e.value, child: Text(e.key)))
                   .toList(),
@@ -161,7 +192,7 @@ class DataManagementPage extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      statusOptions.entries.firstWhere((e) => e.value == statusFilter).key,
+                      statusOptions.entries.firstWhere((e) => e.value == (statusFilter ?? 'all')).key,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: statusFilter != null ? AppTheme.primary : const Color(0xFF1E293B)),
                     ),
                     const SizedBox(width: 12),
@@ -183,11 +214,11 @@ class DataManagementPage extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No data to export.')));
               return;
             }
-            final csv = StringBuffer('Meter ID,Customer,Address,Status\n');
+            final csv = StringBuffer('Customer,Meter ID,Address,Phone Number,Meter Brand,Findings\n');
             for (final m in meters) {
-              csv.writeln('${m.id},${m.customerName},${m.address},${m.status.name}');
+              csv.writeln('"${m.customerName}","${m.id}","${m.address}","${m.telephone}","${m.brand}","${m.findings}"');
             }
-            WebUtils.downloadFile('meters_export.csv', csv.toString());
+            WebUtils.downloadFile('infrastructure_report.csv', csv.toString());
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Export started — check your downloads.'), backgroundColor: Colors.green),
             );
@@ -195,19 +226,9 @@ class DataManagementPage extends ConsumerWidget {
           child: _buildActionSecondary(Icons.upload_outlined, 'Export Data'),
         ),
         const SizedBox(width: 16),
-        // Refresh Sync
-        GestureDetector(
-          onTap: isLoading ? null : () {
-            ref.invalidate(backofficeMetersProvider);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Syncing data from server...'), duration: Duration(seconds: 2)),
-            );
-          },
-          child: _buildActionPrimary(
-            isLoading ? Icons.hourglass_top_rounded : Icons.sync_rounded,
-            isLoading ? 'Syncing...' : 'Refresh Sync',
-          ),
-        ),
+        const SizedBox(width: 16),
+        // Refresh Sync (Animated)
+        const RefreshSyncButton(),
       ],
     );
   }
@@ -324,7 +345,7 @@ class DataManagementPage extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: meters.length,
               separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF8FAFC)),
-              itemBuilder: (context, index) => _buildTableRow(context, index, meters[index]),
+              itemBuilder: (context, index) => _buildTableRow(context, ref, index, meters[index]),
             ),
           ),
           _buildTableFooter(meters.length),
@@ -339,20 +360,29 @@ class DataManagementPage extends ConsumerWidget {
       color: const Color(0xFFF8FAFC),
       child: Row(
         children: [
+          _buildHeadCell('CUSTOMER', 1.2),
+          const SizedBox(width: 32),
           _buildHeadCell('METER ID', 1),
-          _buildHeadCell('CUSTOMER', 2),
-          _buildHeadCell('ADDRESS', 2),
-          _buildHeadCell('EFFICIENCY', 1),
+          const SizedBox(width: 32),
+          _buildHeadCell('ADDRESS', 1.5),
+          const SizedBox(width: 32),
+          _buildHeadCell('PHONE NUMBER', 1),
+          const SizedBox(width: 32),
+          _buildHeadCell('METER BRAND', 1),
+          const SizedBox(width: 32),
+          _buildHeadCell('FINDINGS', 1.2),
+          const SizedBox(width: 32),
           _buildHeadCell('STATUS', 1),
-          _buildHeadCell('ACTIONS', 1, Alignment.centerRight),
+          const SizedBox(width: 32),
+          _buildHeadCell('ACTIONS', 0.6, Alignment.centerRight),
         ],
       ),
     );
   }
 
-  Widget _buildHeadCell(String label, int flex, [Alignment alignment = Alignment.centerLeft]) {
+  Widget _buildHeadCell(String label, num flex, [Alignment alignment = Alignment.centerLeft]) {
     return Expanded(
-      flex: flex,
+      flex: (flex * 10).toInt(),
       child: Container(
         alignment: alignment,
         child: Text(
@@ -368,7 +398,7 @@ class DataManagementPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildTableRow(BuildContext context, int index, Meter meter) {
+  Widget _buildTableRow(BuildContext context, WidgetRef ref, int index, Meter meter) {
     final initials = meter.customerName.split(' ').map((e) => e[0]).take(2).join().toUpperCase();
     final colors = [const Color(0xFFE0E7FF), const Color(0xFFFCD34D), const Color(0xFFFECACA), const Color(0xFFD1FAE5)];
     final avatarColor = colors[index % colors.length];
@@ -381,15 +411,9 @@ class DataManagementPage extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       child: Row(
         children: [
+          // 1. CUSTOMER - Flex 1.2
           Expanded(
-            flex: 1,
-            child: Text(
-              meter.id,
-              style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 14),
-            ),
-          ),
-          Expanded(
-            flex: 2,
+            flex: 12,
             child: Row(
               children: [
                 CircleAvatar(
@@ -400,57 +424,130 @@ class DataManagementPage extends ConsumerWidget {
                     style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      meter.customerName,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Commercial Plus', // Mock category
-                      style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    meter.customerName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 32),
+          // 2. METER ID - Flex 1
           Expanded(
-            flex: 2, 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  meter.address.split(',').first, 
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Northwest Metro', // Mock region
-                  style: TextStyle(color: AppTheme.textLight, fontSize: 12),
-                ),
-              ],
+            flex: 10,
+            child: Text(
+              meter.id,
+              style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.primary, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 32),
+          // 3. ADDRESS - Flex 1.5
           Expanded(
-            flex: 1,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 32),
-              child: _buildEfficiencyBar(index),
+            flex: 15,
+            child: Text(
+              meter.address,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF475569)),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 32),
+          // 4. PHONE - Flex 1
           Expanded(
-            flex: 1, 
+            flex: 10,
+            child: Text(
+              meter.telephone,
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12, color: Color(0xFF64748B)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 32),
+          // 5. BRAND - Flex 1
+          Expanded(
+            flex: 10,
+            child: Text(
+              meter.brand.toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF94A3B8), letterSpacing: 0.5),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 32),
+          // 6. FINDINGS - Flex 1.2
+          Expanded(
+            flex: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: meter.findings.isNotEmpty && meter.findings.toLowerCase().contains('critical') 
+                    ? const Color(0xFFFEF2F2) 
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                meter.findings.isEmpty ? 'No significant findings' : meter.findings,
+                style: TextStyle(
+                  color: meter.findings.isNotEmpty && meter.findings.toLowerCase().contains('critical') 
+                      ? const Color(0xFFB91C1C) 
+                      : const Color(0xFF64748B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(width: 32),
+          // 7. STATUS - Flex 1
+          Expanded(
+            flex: 10,
             child: _buildStatusBadge(meter.status),
           ),
+          const SizedBox(width: 32),
+          // 8. ACTIONS - Flex 0.6
           Expanded(
-            flex: 1,
+            flex: 6,
             child: Container(
               alignment: Alignment.centerRight,
-              child: const Icon(Icons.more_horiz_rounded, color: Color(0xFFCBD5E1)),
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFFCBD5E1)),
+                tooltip: 'Actions',
+                offset: const Offset(0, 40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (value) {
+                  if (value == 'summary') {
+                    ref.read(selectedMeterProvider.notifier).state = meter;
+                    ref.read(backofficePageProvider.notifier).state = BackofficePage.meterDetails;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'summary',
+                    child: Row(
+                      children: [
+                        Icon(Icons.summarize_outlined, size: 18, color: AppTheme.primary),
+                        SizedBox(width: 12),
+                        Text('View Summary', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'history',
+                    child: Row(
+                      children: [
+                        Icon(Icons.history_rounded, size: 18, color: Color(0xFF64748B)),
+                        SizedBox(width: 12),
+                        Text('Status History', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -486,17 +583,21 @@ class DataManagementPage extends ConsumerWidget {
     Color color;
     String label;
     switch (status) {
-      case MeterStatus.active:
-        color = const Color(0xFF22C55E); // Operational
-        label = 'OPERATIONAL';
+      case MeterStatus.paid:
+        color = const Color(0xFF10B981); // Emerald 500
+        label = 'PAID';
         break;
       case MeterStatus.pending:
-        color = const Color(0xFFEAB308); // Low Throughput
-        label = 'LOW THROUGHPUT';
+        color = const Color(0xFFF59E0B); // Amber 500
+        label = 'PENDING';
         break;
-      case MeterStatus.faulty:
-        color = const Color(0xFFEF4444); // Critical Failure
-        label = 'CRITICAL FAILURE';
+      case MeterStatus.billed:
+        color = const Color(0xFF6366F1); // Indigo 500
+        label = 'BILLED';
+        break;
+      case MeterStatus.scheduled:
+        color = const Color(0xFFA855F7); // Purple 500
+        label = 'SCHEDULED';
         break;
     }
 

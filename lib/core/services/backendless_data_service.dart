@@ -31,6 +31,9 @@ class BackendlessDataService {
         'initialReadings': meter.initialReadings,
         'capturedImagePaths': meter.capturedImagePaths,
         'capturedVideoPath': meter.capturedVideoPath,
+        'debtAmount': meter.debtAmount,
+        'offenseType': meter.offenseType,
+        'dateApprehended': meter.dateApprehended?.millisecondsSinceEpoch,
       };
 
       await Backendless.data.of(metersTable).save(data);
@@ -45,6 +48,7 @@ class BackendlessDataService {
       if (result == null) return [];
       return result.map((m) => Meter.fromMap(m!)).toList();
     } catch (e) {
+      print('DEBUG: Backendless error fetching Meters: $e');
       return [];
     }
   }
@@ -55,6 +59,7 @@ class BackendlessDataService {
       if (result == null) return [];
       return result.map((i) => Investigator.fromMap(i!)).toList();
     } catch (e) {
+      print('DEBUG: Backendless error fetching Investigators: $e');
       return [];
     }
   }

@@ -37,13 +37,16 @@ class MeterAdapter extends TypeAdapter<Meter> {
       isSynced: fields[15] as bool,
       capturedImagePaths: (fields[18] as List).cast<String>(),
       capturedVideoPath: fields[19] as String?,
+      debtAmount: fields[20] as double,
+      offenseType: fields[21] as String,
+      dateApprehended: fields[22] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Meter obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(23)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -83,7 +86,13 @@ class MeterAdapter extends TypeAdapter<Meter> {
       ..writeByte(18)
       ..write(obj.capturedImagePaths)
       ..writeByte(19)
-      ..write(obj.capturedVideoPath);
+      ..write(obj.capturedVideoPath)
+      ..writeByte(20)
+      ..write(obj.debtAmount)
+      ..writeByte(21)
+      ..write(obj.offenseType)
+      ..writeByte(22)
+      ..write(obj.dateApprehended);
   }
 
   @override
@@ -105,27 +114,32 @@ class MeterStatusAdapter extends TypeAdapter<MeterStatus> {
   MeterStatus read(BinaryReader reader) {
     switch (reader.readByte()) {
       case 0:
-        return MeterStatus.active;
+        return MeterStatus.paid;
       case 1:
         return MeterStatus.pending;
       case 2:
-        return MeterStatus.faulty;
+        return MeterStatus.billed;
+      case 3:
+        return MeterStatus.scheduled;
       default:
-        return MeterStatus.active;
+        return MeterStatus.paid;
     }
   }
 
   @override
   void write(BinaryWriter writer, MeterStatus obj) {
     switch (obj) {
-      case MeterStatus.active:
+      case MeterStatus.paid:
         writer.writeByte(0);
         break;
       case MeterStatus.pending:
         writer.writeByte(1);
         break;
-      case MeterStatus.faulty:
+      case MeterStatus.billed:
         writer.writeByte(2);
+        break;
+      case MeterStatus.scheduled:
+        writer.writeByte(3);
         break;
     }
   }

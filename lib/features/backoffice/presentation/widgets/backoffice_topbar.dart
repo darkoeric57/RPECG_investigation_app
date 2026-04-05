@@ -44,6 +44,8 @@ class BackofficeTopBar extends ConsumerWidget {
           return 'Settings';
         case BackofficePage.billingDashboard:
           return 'Billing Intelligence';
+        case BackofficePage.meterDetails:
+          return 'Investigation Summary';
       }
     }
 

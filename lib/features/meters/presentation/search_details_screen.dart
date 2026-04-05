@@ -68,9 +68,10 @@ class SearchDetailsScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               children: [
                 _buildFilterChip('All Status', filters.status == SearchStatus.all, () => filterNotifier.updateStatus(SearchStatus.all)),
-                _buildFilterChip('Active', filters.status == SearchStatus.active, () => filterNotifier.updateStatus(SearchStatus.active)),
+                _buildFilterChip('Paid', filters.status == SearchStatus.paid, () => filterNotifier.updateStatus(SearchStatus.paid)),
                 _buildFilterChip('Pending', filters.status == SearchStatus.pending, () => filterNotifier.updateStatus(SearchStatus.pending)),
-                _buildFilterChip('Faulty', filters.status == SearchStatus.faulty, () => filterNotifier.updateStatus(SearchStatus.faulty)),
+                _buildFilterChip('Billed', filters.status == SearchStatus.billed, () => filterNotifier.updateStatus(SearchStatus.billed)),
+                _buildFilterChip('Scheduled', filters.status == SearchStatus.scheduled, () => filterNotifier.updateStatus(SearchStatus.scheduled)),
               ],
             ),
           ),
@@ -119,14 +120,17 @@ class SearchDetailsScreen extends ConsumerWidget {
   Widget _buildResultItem(BuildContext context, Meter meter) {
     Color statusColor;
     switch (meter.status) {
-      case MeterStatus.active:
-        statusColor = Colors.green;
+      case MeterStatus.paid:
+        statusColor = const Color(0xFF10B981); // Emerald
         break;
       case MeterStatus.pending:
-        statusColor = Colors.orange;
+        statusColor = const Color(0xFFF59E0B); // Amber
         break;
-      case MeterStatus.faulty:
-        statusColor = Colors.red;
+      case MeterStatus.billed:
+        statusColor = const Color(0xFF6366F1); // Indigo
+        break;
+      case MeterStatus.scheduled:
+        statusColor = const Color(0xFFA855F7); // Purple
         break;
     }
 
