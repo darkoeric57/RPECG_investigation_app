@@ -46,6 +46,16 @@ class BackofficeTopBar extends ConsumerWidget {
           return 'Billing Intelligence';
         case BackofficePage.meterDetails:
           return 'Investigation Summary';
+        case BackofficePage.editInvestigation:
+          return 'Edit Investigation';
+        case BackofficePage.billingAccountDetails:
+          return 'Account Details';
+        case BackofficePage.billingEditAccount:
+          return 'Edit Billing Account';
+        case BackofficePage.billingStatusHistory:
+          return 'Status History';
+        case BackofficePage.billingSchedule:
+          return 'Schedule Payment Date';
       }
     }
 
@@ -71,30 +81,32 @@ class BackofficeTopBar extends ConsumerWidget {
           ),
           const SizedBox(width: 32),
 
-          // Search bar
+          // Search bar (hidden on billing dashboard as it's moved to the activity card)
           Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search investigators, reports, or meters...',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      prefixIcon: Icon(Icons.search, color: Color(0xFF94A3B8), size: 18),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+            child: currentPage == BackofficePage.billingDashboard
+                ? const SizedBox.shrink()
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search investigators, reports, or meters...',
+                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                            prefixIcon: Icon(Icons.search, color: Color(0xFF94A3B8), size: 18),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
           ),
           const SizedBox(width: 24),
 

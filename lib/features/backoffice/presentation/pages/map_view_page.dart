@@ -84,7 +84,7 @@ class _MapViewPageState extends ConsumerState<MapViewPage> with SingleTickerProv
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const SizedBox(),
+          error: (_, _) => const SizedBox(),
         ),
 
         // Bottom Control Panel

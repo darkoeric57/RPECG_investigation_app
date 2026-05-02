@@ -55,6 +55,10 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
 
             // Secondary info Grid
             _buildSecondaryGrid(meter),
+            const SizedBox(height: 32),
+
+            // Media Files Section
+            _buildMediaFilesCard(meter),
             const SizedBox(height: 48),
 
             // Map/Evidence Section
@@ -160,8 +164,9 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
 
   Widget _buildLifecycleStatus(BuildContext context, Meter meter) {
     int activeIndex = 0;
-    if (meter.status == MeterStatus.pending) activeIndex = 0;
-    else if (meter.status == MeterStatus.billed) activeIndex = 1;
+    if (meter.status == MeterStatus.pending) {
+      activeIndex = 0;
+    } else if (meter.status == MeterStatus.billed) activeIndex = 1;
     else if (meter.status == MeterStatus.scheduled) activeIndex = 2;
     else if (meter.status == MeterStatus.paid) activeIndex = 3;
 
@@ -173,7 +178,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
         border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primary.withOpacity(0.04),
+            color: AppTheme.primary.withValues(alpha: 0.04),
             blurRadius: 40,
             offset: const Offset(0, 10),
           ),
@@ -207,9 +212,9 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.accent.withOpacity(0.1),
+                  color: AppTheme.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: AppTheme.accent.withOpacity(0.2)),
+                  border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -274,7 +279,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
             color: isActive ? AppTheme.primary : const Color(0xFFF1F5F9),
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 4),
-            boxShadow: isActive ? [BoxShadow(color: AppTheme.primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))] : null,
+            boxShadow: isActive ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5))] : null,
           ),
           child: Center(
             child: Text(
@@ -334,9 +339,9 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppTheme.error.withOpacity(0.05),
+                    color: AppTheme.error.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppTheme.error.withOpacity(0.1)),
+                    border: Border.all(color: AppTheme.error.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -371,7 +376,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
                       child: Text(meter.id, style: const TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1)),
                     ),
                   ],
@@ -394,7 +399,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: const Border(bottom: BorderSide(color: AppTheme.error, width: 4)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 20)],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 20)],
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -404,7 +409,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
                 const Text('OFFENSE CONFIRMED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 2)),
                 const SizedBox(height: 8),
                 Text(
-                  meter.offenseType.toUpperCase(),
+                  (meter.findings ?? 'NO FINDINGS REPORTED').toUpperCase(),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.error, letterSpacing: -0.5),
                   textAlign: TextAlign.center,
                 ),
@@ -478,7 +483,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
               children: [
                 Container(
                   width: 44, height: 44,
-                  decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.explore_rounded, color: AppTheme.primary),
                 ),
                 const SizedBox(width: 16),
@@ -492,25 +497,148 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const Spacer(),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.map_rounded, size: 14),
-                  label: const Text('VIEW ON GRID MAP'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMediaFilesCard(Meter meter) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primary.withValues(alpha: 0.04),
+            blurRadius: 40,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.perm_media_rounded, color: AppTheme.primary, size: 20),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text('MEDIA FILES & EVIDENCE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: -0.5)),
+                ],
+              ),
+              TextButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.download_rounded, size: 14),
+                label: const Text('DOWNLOAD BUNDLE'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF94A3B8),
+                  textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image Gallery
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('IMAGE CAPTURES (5)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                    const SizedBox(height: 16),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildMediaThumbnail('https://i.ibb.co/3W6pZPx/meter-1.jpg'),
+                          _buildMediaThumbnail('https://i.ibb.co/680L93L/meter-2.jpg'),
+                          _buildMediaThumbnail('https://i.ibb.co/L5kRj6y/meter-3.jpg'),
+                          _buildMediaThumbnail('https://i.ibb.co/W2zZ0Wq/meter-4.jpg'),
+                          _buildMediaThumbnail('https://i.ibb.co/fQtYq8F/meter-5.jpg'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 48),
+              // Video Evidence
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('VIDEO EVIDENCE (1)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                    const SizedBox(height: 16),
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          height: 120,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            image: const DecorationImage(
+                              image: NetworkImage('https://i.ibb.co/3C5Y93L/video-thumb.jpg'),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          height: 120,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        Container(
+                          width: 48, height: 48,
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: const Icon(Icons.play_arrow_rounded, color: AppTheme.primary, size: 32),
+                        ),
+                        Positioned(
+                          bottom: 12, right: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(6)),
+                            child: const Text('0:24', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaThumbnail(String url) {
+    return Container(
+      width: 120, height: 120,
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1),
+      ),
     );
   }
 
@@ -523,7 +651,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0xFFF1F5F9)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 40, offset: const Offset(0, 10)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 40, offset: const Offset(0, 10)),
             ],
           ),
           clipBehavior: Clip.antiAlias,
@@ -558,7 +686,7 @@ class MeterDetailsSummaryPage extends ConsumerWidget {
                 ),
                 child: Stack(
                   children: [
-                    Container(color: AppTheme.primary.withOpacity(0.05)),
+                    Container(color: AppTheme.primary.withValues(alpha: 0.05)),
                     Center(
                       child: Stack(
                         alignment: Alignment.center,
@@ -619,7 +747,7 @@ class _AnimatedPulseState extends State<_AnimatedPulse> with SingleTickerProvide
           width: 60 + (60 * _controller.value),
           height: 60 + (60 * _controller.value),
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(0.3 * (1 - _controller.value)),
+            color: widget.color.withValues(alpha: 0.3 * (1 - _controller.value)),
             shape: BoxShape.circle,
           ),
         );

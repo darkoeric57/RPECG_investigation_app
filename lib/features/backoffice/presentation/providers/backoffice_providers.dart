@@ -15,6 +15,11 @@ enum BackofficePage {
   settings,
   billingDashboard,
   meterDetails,
+  editInvestigation,
+  billingAccountDetails,
+  billingEditAccount,
+  billingStatusHistory,
+  billingSchedule,
 }
 
 final backofficePageProvider =
@@ -23,6 +28,9 @@ final backofficePageProvider =
 final isSidebarCollapsedProvider = StateProvider<bool>((ref) => false);
 
 final selectedMeterProvider = StateProvider<Meter?>((ref) => null);
+
+/// Holds the currently selected billing account map for action pages
+final selectedBillingAccountProvider = StateProvider<Map<String, String>?>((ref) => null);
 
 // ─── Meters ───────────────────────────────────────────────────────────────────
 
@@ -33,32 +41,78 @@ final backofficeMetersProvider = FutureProvider<List<Meter>>((ref) async {
 
 final meterSearchQueryProvider = StateProvider<String>((ref) => '');
 
-/// Active filter: null = All, otherwise MeterStatus value
-final meterStatusFilterProvider = StateProvider<MeterStatus?>((ref) => null);
+/// Advanced Filters (Sets for dynamic multi-selection)
+final meterStatusFilterSetProvider = StateProvider<Set<MeterStatus>>((ref) => {});
+final meterBrandFilterSetProvider = StateProvider<Set<String>>((ref) => {});
+final meterFindingsFilterSetProvider = StateProvider<Set<String>>((ref) => {});
+
+/// Dynamically aggregate available filter values from current data
+final availableFilterValuesProvider = Provider<({Set<MeterStatus> statuses, Set<String> brands, Set<String> findingsKeywords})>((ref) {
+  final metersAsync = ref.watch(backofficeMetersProvider);
+  return metersAsync.maybeWhen(
+    data: (meters) {
+      final statuses = meters.map((m) => m.status).toSet();
+      final brands = meters.map((m) => m.brand).where((b) => b.isNotEmpty).toSet();
+      
+      final findingsKeywords = <String>{};
+      for (final meter in meters) {
+        final findings = meter.findings;
+        if (findings != null && findings.isNotEmpty) {
+          findingsKeywords.add(findings);
+        }
+      }
+
+      return (
+        statuses: statuses,
+        brands: brands,
+        findingsKeywords: findingsKeywords,
+      );
+    },
+    orElse: () => (statuses: <MeterStatus>{}, brands: <String>{}, findingsKeywords: <String>{}),
+  );
+});
 
 final filteredMetersProvider = Provider<List<Meter>>((ref) {
   final metersAsync = ref.watch(backofficeMetersProvider);
-  final query = ref.watch(meterSearchQueryProvider).toLowerCase();
-  final statusFilter = ref.watch(meterStatusFilterProvider);
+  final searchQuery = ref.watch(meterSearchQueryProvider).toLowerCase();
+  
+  // Advanced filters (Sets)
+  final statusFilters = ref.watch(meterStatusFilterSetProvider);
+  final brandFilters = ref.watch(meterBrandFilterSetProvider);
+  final findingsFilters = ref.watch(meterFindingsFilterSetProvider);
 
   return metersAsync.when(
     data: (meters) {
       var filtered = meters;
-      if (query.isNotEmpty) {
-        filtered = filtered
-            .where((m) =>
-                m.customerName.toLowerCase().contains(query) ||
-                m.id.toLowerCase().contains(query) ||
-                m.address.toLowerCase().contains(query))
-            .toList();
+      
+      // 1. General search (Customer Name, ID, Address)
+      if (searchQuery.isNotEmpty) {
+        filtered = filtered.where((m) =>
+            m.customerName.toLowerCase().contains(searchQuery) ||
+            m.id.toLowerCase().contains(searchQuery) ||
+            (m.findings ?? '').toLowerCase().contains(searchQuery) ||
+            m.address.toLowerCase().contains(searchQuery)).toList();
       }
-      if (statusFilter != null) {
-        filtered = filtered.where((m) => m.status == statusFilter).toList();
+      
+      // 2. Status Intersection (Match any selected status)
+      if (statusFilters.isNotEmpty) {
+        filtered = filtered.where((m) => statusFilters.contains(m.status)).toList();
       }
+      
+      // 3. Brand Intersection
+      if (brandFilters.isNotEmpty) {
+        filtered = filtered.where((m) => brandFilters.contains(m.brand)).toList();
+      }
+      
+      // 4. Findings Intersection
+      if (findingsFilters.isNotEmpty) {
+        filtered = filtered.where((m) => findingsFilters.contains(m.findings)).toList();
+      }
+      
       return filtered;
     },
     loading: () => [],
-    error: (_, __) => [],
+    error: (_, _) => [],
   );
 });
 
@@ -87,7 +141,7 @@ final faultyMetersCountProvider = Provider.family<int, String>((ref, category) {
       
       int countFor(String cat) {
         return faultyMeters.where((m) {
-          final findings = m.findings.toLowerCase();
+          final findings = (m.findings ?? '').toLowerCase();
           final c = cat.toLowerCase();
           if (c.contains('tamper') && findings.contains('tamper')) return true;
           if (c.contains('by-pass') && findings.contains('bypass')) return true;
@@ -218,3 +272,56 @@ final chatMessagesProvider = StateProvider<Map<int, List<Map<String, dynamic>>>>
 /// Mark conversations as read when selected
 final unreadConversationsProvider =
     StateProvider<Set<int>>((ref) => {0}); // 0 is unread by default
+
+// ─── Add Infrastructure ──────────────────────────────────────────────────────────
+
+final addMeterActionProvider = Provider((ref) {
+  return (Meter meter) async {
+    final dataService = BackendlessDataService();
+    await dataService.saveMeter(meter);
+    // Refresh the list after saving
+    ref.invalidate(backofficeMetersProvider);
+  };
+});
+
+final deleteMeterActionProvider = Provider((ref) {
+  return (String objectId) async {
+    final dataService = BackendlessDataService();
+    try {
+      await dataService.deleteMeter(objectId);
+      // Refresh the list after deleting
+      ref.invalidate(backofficeMetersProvider);
+    } catch (e) {
+      print('DEBUG: Deletion action error: $e');
+      rethrow;
+    }
+  };
+});
+// ─── Billing Dashboard ────────────────────────────────────────────────────────
+ 
+final billingAccountsProvider = StateProvider<List<Map<String, String>>>((ref) => [
+  {'initials': 'RJ', 'name': 'Robert Jenkins', 'meter': 'MTR-88291', 'account': 'ACC-00412', 'consumption': '99120-X', 'fraud_status': 'Tamper', 'total_amount': '12', 'balance': 'GHS 1,240.50', 'tariff': 'Residential', 'status': 'Overdue', 'scheduled': '10 Oct 2026', 'created_at': '01 Oct 2026'},
+  {'initials': 'AS', 'name': 'Alina Sterling', 'meter': 'MTR-90023', 'account': 'ACC-11892', 'consumption': '44120-P', 'fraud_status': '—', 'total_amount': '4', 'balance': 'GHS 0.00', 'tariff': 'Residential', 'status': 'Paid', 'scheduled': '—', 'created_at': '05 Oct 2026'},
+  {'initials': 'GC', 'name': 'Green City Logistics', 'meter': 'MTR-77121', 'account': 'ACC-88321', 'consumption': '22900-L', 'fraud_status': 'Faulty meter', 'total_amount': '24', 'balance': 'GHS 14,500.00', 'tariff': 'Non-Residential', 'status': 'Scheduled', 'scheduled': '20 Oct 2026', 'created_at': '10 Oct 2026'},
+  {'initials': 'MM', 'name': 'Marcus Miller', 'meter': 'MTR-12554', 'account': 'ACC-55231', 'consumption': '11204-K', 'fraud_status': 'Bypass', 'total_amount': '1', 'balance': 'GHS 245.20', 'tariff': 'Residential', 'status': 'Pending', 'scheduled': '22 Oct 2026', 'created_at': '12 Oct 2026'},
+  {'initials': 'SD', 'name': 'Sun Dry Cleaners', 'meter': 'MTR-44211', 'account': 'ACC-99011', 'consumption': '88412-Y', 'fraud_status': 'No network service connection', 'total_amount': '36', 'balance': 'GHS 3,890.15', 'tariff': 'Non-Residential', 'status': 'Overdue', 'scheduled': '05 Oct 2026', 'created_at': '25 Sep 2026'},
+]);
+
+final billingSearchQueryProvider = StateProvider<String>((ref) => '');
+
+final filteredBillingAccountsProvider = Provider<List<Map<String, String>>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider);
+  final query = ref.watch(billingSearchQueryProvider).toLowerCase().trim();
+  
+  if (query.isEmpty) return accounts;
+  
+  return accounts.where((account) {
+    final name = (account['name'] ?? '').toLowerCase();
+    final meter = (account['meter'] ?? '').toLowerCase();
+    final accountNumber = (account['account'] ?? '').toLowerCase();
+    
+    return name.contains(query) || 
+           meter.contains(query) || 
+           accountNumber.contains(query);
+  }).toList();
+});

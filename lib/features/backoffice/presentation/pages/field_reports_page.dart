@@ -405,15 +405,15 @@ class _FieldReportsPageState extends ConsumerState<FieldReportsPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   ),
                   child: TextField(
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Send a priority update to $investigator...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14),
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
                       border: InputBorder.none,
                     ),
                   ),
@@ -436,7 +436,7 @@ class _FieldReportsPageState extends ConsumerState<FieldReportsPage> {
           const SizedBox(height: 16),
           Text(
             '$investigator is currently online via $unit',
-            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11, fontStyle: FontStyle.italic),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11, fontStyle: FontStyle.italic),
           ),
         ],
       ),
@@ -458,7 +458,7 @@ class _FieldReportsPageState extends ConsumerState<FieldReportsPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

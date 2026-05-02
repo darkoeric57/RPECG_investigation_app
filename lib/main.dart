@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'core/providers.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'features/meters/domain/meter.dart';
+import 'features/backoffice/domain/installment.dart';
 import 'features/dashboard/domain/investigator.dart';
 import 'package:backendless_sdk/backendless_sdk.dart';
 import 'core/config/app_config.dart';
@@ -13,12 +14,14 @@ import 'core/services/backendless_auth_service.dart';
 // import 'main.reflectable.dart';
 import 'package:google_sign_in/google_sign_in.dart' as gsi;
 import 'core/utils/web_utils.dart';
+import 'package:worker_manager/worker_manager.dart';
 
 // Google Sign In configuration
 final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await workerManager.init();
   // initializeReflectable();
   
   debugPrint('BACKENDLESS_AUTH_DEBUG: main() started');
@@ -70,6 +73,7 @@ void main() async {
   Hive.registerAdapter(TariffActivityAdapter());
   Hive.registerAdapter(MeterPhaseAdapter());
   Hive.registerAdapter(MeteringTypeAdapter());
+  Hive.registerAdapter(InstallmentAdapter());
   Hive.registerAdapter(MeterAdapter());
   Hive.registerAdapter(InvestigatorStatusAdapter());
   Hive.registerAdapter(InvestigatorAdapter());

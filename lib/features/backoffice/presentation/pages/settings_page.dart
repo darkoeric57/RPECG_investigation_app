@@ -92,7 +92,7 @@ class SettingsPage extends ConsumerWidget {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -106,7 +106,7 @@ class SettingsPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.08),
+                  color: AppTheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: AppTheme.primary, size: 20),
@@ -288,7 +288,7 @@ class SettingsPage extends ConsumerWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppTheme.primary,
+          activeThumbColor: AppTheme.primary,
         ),
       ],
     );
@@ -323,7 +323,7 @@ class SettingsPage extends ConsumerWidget {
                 label: const Text('Change Password'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.primary,
-                  side: BorderSide(color: AppTheme.primary.withOpacity(0.4)),
+                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),

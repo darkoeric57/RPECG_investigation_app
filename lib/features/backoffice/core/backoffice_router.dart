@@ -16,7 +16,7 @@ class RouterNotifier extends ChangeNotifier {
 
   RouterNotifier(this._ref) {
     // Whenever auth state changes, tell the router to re-run the redirect.
-    _ref.listen(userProvider, (_, __) => notifyListeners());
+    _ref.listen(userProvider, (_, _) => notifyListeners());
   }
 }
 

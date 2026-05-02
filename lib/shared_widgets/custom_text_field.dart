@@ -69,22 +69,21 @@ class CustomTextField extends StatelessWidget {
           onChanged: (val) {
             onChanged?.call(val);
           },
-          style: const TextStyle(
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             fontSize: 15,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF1E293B),
-            height: 1.2, // Force consistent line height
+            height: 1.2,
           ),
           decoration: InputDecoration(
-            isDense: true, // Use isDense to have more control over padding
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+            isDense: true, 
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
             hintText: hint,
-            hintStyle: TextStyle(
-              color: AppTheme.textLight.withValues(alpha: 0.6), 
-              fontWeight: FontWeight.normal,
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).hintColor,
               fontSize: 15,
+              fontWeight: FontWeight.normal,
             ),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppTheme.textLight, size: 20) : null,
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.6), size: 20) : null,
             suffixIcon: isLoading 
                 ? const UnconstrainedBox(
                     child: SizedBox(

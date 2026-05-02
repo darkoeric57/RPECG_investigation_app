@@ -66,7 +66,7 @@ class _RefreshSyncButtonState extends ConsumerState<RefreshSyncButton>
           boxShadow: [
             if (isLoading)
               BoxShadow(
-                color: const Color(0xFFFDE047).withOpacity(0.4),
+                color: const Color(0xFFFDE047).withValues(alpha: 0.4),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),

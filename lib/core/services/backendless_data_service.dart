@@ -10,6 +10,16 @@ class BackendlessDataService {
   static const String metersTable = 'Meters';
   static const String investigatorsTable = 'Investigators';
 
+  Future<void> deleteMeter(String objectId) async {
+    try {
+      if (objectId.isEmpty) return;
+      await Backendless.data.of(metersTable).remove(entity: {'objectId': objectId});
+    } catch (e) {
+      print('DEBUG: Backendless error deleting Meter $objectId: $e');
+      rethrow;
+    }
+  }
+
   Future<void> saveMeter(Meter meter) async {
     try {
       final Map<String, dynamic> data = {
@@ -32,9 +42,16 @@ class BackendlessDataService {
         'capturedImagePaths': meter.capturedImagePaths,
         'capturedVideoPath': meter.capturedVideoPath,
         'debtAmount': meter.debtAmount,
+        'paidAmount': meter.paidAmount,
         'offenseType': meter.offenseType,
         'dateApprehended': meter.dateApprehended?.millisecondsSinceEpoch,
+        'findings': meter.findings,
+        if (meter.installments != null) 'installments': meter.installments!.map((i) => i.toMap()).toList(),
       };
+
+      if (meter.objectId != null) {
+        data['objectId'] = meter.objectId;
+      }
 
       await Backendless.data.of(metersTable).save(data);
     } catch (e) {
@@ -44,9 +61,12 @@ class BackendlessDataService {
 
   Future<List<Meter>> getRemoteMeters() async {
     try {
-      final result = await Backendless.data.of(metersTable).find();
-      if (result == null) return [];
-      return result.map((m) => Meter.fromMap(m!)).toList();
+      final queryBuilder = DataQueryBuilder()
+        ..pageSize = 100
+        ..sortBy = ['installationDate DESC'];
+        
+      final response = await Backendless.data.of(metersTable).find(queryBuilder);
+      return (response as List).map((m) => Meter.fromMap(Map<String, dynamic>.from(m as Map))).toList();
     } catch (e) {
       print('DEBUG: Backendless error fetching Meters: $e');
       return [];
@@ -56,8 +76,7 @@ class BackendlessDataService {
   Future<List<Investigator>> getInvestigators() async {
     try {
       final result = await Backendless.data.of(investigatorsTable).find();
-      if (result == null) return [];
-      return result.map((i) => Investigator.fromMap(i!)).toList();
+      return result.map((i) => Investigator.fromMap(i)).toList();
     } catch (e) {
       print('DEBUG: Backendless error fetching Investigators: $e');
       return [];

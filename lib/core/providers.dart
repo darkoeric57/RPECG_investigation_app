@@ -9,7 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart' as auth;
 import 'package:backendless_sdk/backendless_sdk.dart';
 
 // Theme Logic
-final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 // Auth State
 final userProvider = StateProvider<BackendlessUser?>((ref) => null);

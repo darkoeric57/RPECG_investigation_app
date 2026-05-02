@@ -1,0 +1,2 @@
+"      child: LayoutBuilder(\n        builder: (context, constraints) {\n          return Scrollbar(\n            child: SingleChildScrollView(\n              scrollDirection: Axis.horizontal,\n              child: ConstrainedBox(\n                constrai
+<truncated 1310 bytes>

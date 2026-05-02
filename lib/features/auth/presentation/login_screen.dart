@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared_widgets/custom_button.dart';
 import '../../../shared_widgets/custom_text_field.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/services/backendless_auth_service.dart';
@@ -249,7 +248,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     final bool isWide = MediaQuery.of(context).size.width > 900;
     
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: isWide ? _buildWideLayout() : _buildNarrowLayout(),
     );
   }
@@ -349,7 +348,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
         Expanded(
           flex: 5,
           child: Container(
-            color: AppTheme.surfaceContainerLowest,
+            color: Theme.of(context).colorScheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 100),
             child: Center(
               child: ConstrainedBox(
@@ -483,7 +482,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text('Sign In', style: TextStyle(fontSize: 16)),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Icon(Icons.arrow_forward, size: 20),
                 ],
               ),
@@ -527,11 +526,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.5,
-          color: Color(0xFF444651),
+          color: Theme.of(context).textTheme.labelLarge?.color ?? const Color(0xFF444651),
         ),
       ),
     );

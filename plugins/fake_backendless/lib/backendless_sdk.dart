@@ -1,4 +1,4 @@
-library backendless_sdk;
+library;
 
 import 'dart:async';
 import 'dart:convert';
@@ -124,11 +124,19 @@ class DataStore<T> {
 
   Future<T?> save(T entity) async {
     final data = entity is Map ? entity : (entity as dynamic).toMap();
-    final response = await http.post(
-      Uri.parse('${Backendless._baseUrl}/data/$tableName'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
+    final objectId = data['objectId'];
+    
+    final response = objectId != null
+        ? await http.put(
+            Uri.parse('${Backendless._baseUrl}/data/$tableName/$objectId'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          )
+        : await http.post(
+            Uri.parse('${Backendless._baseUrl}/data/$tableName'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as T;
@@ -138,15 +146,32 @@ class DataStore<T> {
     }
   }
 
-  Future<List<T>?> find([dynamic query]) async {
+  Future<List<T>> find([dynamic query]) async {
     String? whereClause;
+    int? pageSize;
+    List<String>? sortBy;
+
     if (query is DataQueryBuilder) {
       whereClause = query._where;
+      pageSize = query.pageSize;
+      sortBy = query.sortBy;
     }
 
     var url = '${Backendless._baseUrl}/data/$tableName';
+    final List<String> params = [];
+
     if (whereClause != null) {
-      url += '?where=${Uri.encodeComponent(whereClause)}';
+      params.add('where=${Uri.encodeComponent(whereClause)}');
+    }
+    if (pageSize != null) {
+      params.add('pageSize=$pageSize');
+    }
+    if (sortBy != null && sortBy.isNotEmpty) {
+      params.add('sortBy=${Uri.encodeComponent(sortBy.join(','))}');
+    }
+
+    if (params.isNotEmpty) {
+      url += '?${params.join('&')}';
     }
 
     final response = await http.get(Uri.parse(url));
@@ -159,10 +184,36 @@ class DataStore<T> {
       throw BackendlessException(error['code']?.toString(), error['message']);
     }
   }
+
+  Future<dynamic> remove({T? entity, String? objectId}) async {
+    String? id;
+    if (objectId != null) {
+      id = objectId;
+    } else if (entity != null) {
+      id = entity is Map ? entity['objectId'] : (entity as dynamic).objectId;
+    }
+
+    if (id == null) return null;
+
+    final response = await http.delete(
+      Uri.parse('${Backendless._baseUrl}/data/$tableName/$id'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw BackendlessException(error['code']?.toString(), error['message']);
+    }
+  }
 }
 
 class DataQueryBuilder {
   String? _where;
+  int? pageSize;
+  List<String>? sortBy;
+
   static DataQueryBuilder create() => DataQueryBuilder();
   void whereClause(String where) => _where = where;
 }

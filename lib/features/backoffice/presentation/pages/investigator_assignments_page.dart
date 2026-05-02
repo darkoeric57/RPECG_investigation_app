@@ -52,7 +52,7 @@ class InvestigatorAssignmentsPage extends ConsumerWidget {
           bottom: 0,
           child: investigatorsAsync.when(
             loading: () => _buildBottomBar(context, 0, 0),
-            error: (_, __) => _buildBottomBar(context, 0, 0),
+            error: (_, _) => _buildBottomBar(context, 0, 0),
             data: (investigators) {
               final all = investigators.isEmpty ? _getMockInvestigators() : investigators;
               final online = all.where((i) => i.status == InvestigatorStatus.online).length;
@@ -151,7 +151,7 @@ class InvestigatorAssignmentsPage extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -286,12 +286,12 @@ class InvestigatorAssignmentsPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isOffDuty ? const Color(0xFFF1F5F9).withOpacity(0.5) : Colors.white,
+        color: isOffDuty ? const Color(0xFFF1F5F9).withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../widgets/add_infrastructure_dialog.dart';
 import '../providers/backoffice_providers.dart';
 import '../../../../features/meters/domain/meter.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/utils/web_utils.dart';
 import '../widgets/refresh_sync_button.dart';
 
@@ -27,7 +27,7 @@ class DataManagementPage extends ConsumerWidget {
             const SizedBox(height: 32),
             _buildDataTable(context, meters, metersAsync, ref),
             const SizedBox(height: 40),
-            _buildAnalyticsSection(context),
+            _buildAnalyticsSection(context, ref),
           ],
         ),
       ),
@@ -118,93 +118,25 @@ class DataManagementPage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Managing 1,284 active nodes across Northwest Region',
-          style: TextStyle(color: AppTheme.textMedium.withOpacity(0.8), fontSize: 16),
+        Consumer(
+          builder: (context, ref, child) {
+            final total = ref.watch(totalMetersCountProvider);
+            return Text(
+              'Managing $total active nodes across Northwest Region',
+              style: TextStyle(color: AppTheme.textMedium.withValues(alpha: 0.8), fontSize: 16),
+            );
+          },
         ),
       ],
     );
   }
 
   Widget _buildFiltersAndActions(BuildContext context, WidgetRef ref, AsyncValue<List<Meter>> metersAsync) {
-    final statusFilter = ref.watch(meterStatusFilterProvider);
-    final isLoading = metersAsync is AsyncLoading;
-
-    final statusOptions = <String, dynamic>{
-      'All Status': 'all',
-      'Paid': MeterStatus.paid,
-      'Pending': MeterStatus.pending,
-      'Billed': MeterStatus.billed,
-      'Scheduled': MeterStatus.scheduled,
-    };
-
-    final hasActiveFilter = statusFilter != null;
-
     return Row(
       children: [
-        // STATUS filter dropdown
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
-                if (hasActiveFilter) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => ref.read(meterStatusFilterProvider.notifier).state = null,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.error.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'CLEAR',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.error),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            PopupMenuButton<dynamic>(
-              onSelected: (val) {
-                if (val == 'all') {
-                  ref.read(meterStatusFilterProvider.notifier).state = null;
-                } else {
-                  ref.read(meterStatusFilterProvider.notifier).state = val as MeterStatus;
-                }
-              },
-              itemBuilder: (_) => statusOptions.entries
-                  .map((e) => PopupMenuItem(value: e.value, child: Text(e.key)))
-                  .toList(),
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: statusFilter != null ? AppTheme.primary.withOpacity(0.08) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: statusFilter != null ? AppTheme.primary.withOpacity(0.4) : const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      statusOptions.entries.firstWhere((e) => e.value == (statusFilter ?? 'all')).key,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: statusFilter != null ? AppTheme.primary : const Color(0xFF1E293B)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 24),
-        _buildFilterDropdown('REGION', 'All Regions'),
+        _buildPremiumFilterButton(context, ref),
+        const SizedBox(width: 16),
+        _buildAddDataButton(context, ref),
         const Spacer(),
         // Export CSV
         GestureDetector(
@@ -214,9 +146,12 @@ class DataManagementPage extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No data to export.')));
               return;
             }
-            final csv = StringBuffer('Customer,Meter ID,Address,Phone Number,Meter Brand,Findings\n');
+            final csv = StringBuffer('Customer,Meter ID,Phone Number,Meter Brand,Findings,Bill Amount,Paid Amount\n');
             for (final m in meters) {
-              csv.writeln('"${m.customerName}","${m.id}","${m.address}","${m.telephone}","${m.brand}","${m.findings}"');
+              final findings = m.findings ?? 'None';
+              final debt = m.debtAmount ?? 0.0;
+              final paid = m.paidAmount ?? 0.0;
+              csv.writeln('"${m.customerName}","${m.id}","${m.telephone}","${m.brand}","$findings","GHS ${debt.toStringAsFixed(2)}","GHS ${paid.toStringAsFixed(2)}"');
             }
             WebUtils.downloadFile('infrastructure_report.csv', csv.toString());
             ScaffoldMessenger.of(context).showSnackBar(
@@ -292,6 +227,98 @@ class DataManagementPage extends ConsumerWidget {
     );
   }
 
+  Widget _buildPremiumFilterButton(BuildContext context, WidgetRef ref) {
+    final statusFilters = ref.watch(meterStatusFilterSetProvider);
+    final brandFilters = ref.watch(meterBrandFilterSetProvider);
+    final findingsFilters = ref.watch(meterFindingsFilterSetProvider);
+
+    int activeCount = statusFilters.length + brandFilters.length + findingsFilters.length;
+
+    return GestureDetector(
+      onTap: () => Scaffold.of(context).openEndDrawer(),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: activeCount > 0 ? AppTheme.primary.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: activeCount > 0 ? AppTheme.primary : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune_rounded, size: 18, color: activeCount > 0 ? AppTheme.primary : const Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text(
+              'Filters',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: activeCount > 0 ? AppTheme.primary : const Color(0xFF1E293B),
+              ),
+            ),
+            if (activeCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
+                child: Text(
+                  activeCount.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddDataButton(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.1),
+        builder: (_) => const AddInfrastructureDialog(),
+      ),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.primary, Color(0xFF818CF8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, size: 20, color: Colors.white),
+            SizedBox(width: 8),
+            Text(
+              'ADD DATA',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionPrimary(IconData icon, String label) {
     return Container(
       height: 44,
@@ -326,7 +353,7 @@ class DataManagementPage extends ConsumerWidget {
         border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.05),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -348,7 +375,7 @@ class DataManagementPage extends ConsumerWidget {
               itemBuilder: (context, index) => _buildTableRow(context, ref, index, meters[index]),
             ),
           ),
-          _buildTableFooter(meters.length),
+          _buildTableFooter(meters.length, ref),
         ],
       ),
     );
@@ -362,19 +389,21 @@ class DataManagementPage extends ConsumerWidget {
         children: [
           _buildHeadCell('CUSTOMER', 1.2),
           const SizedBox(width: 32),
-          _buildHeadCell('METER ID', 1),
+          _buildHeadCell('METER ID', 1.0),
           const SizedBox(width: 32),
-          _buildHeadCell('ADDRESS', 1.5),
+          _buildHeadCell('PHONE NUMBER', 1.0),
           const SizedBox(width: 32),
-          _buildHeadCell('PHONE NUMBER', 1),
+          _buildHeadCell('METER BRAND', 0.9),
           const SizedBox(width: 32),
-          _buildHeadCell('METER BRAND', 1),
+          _buildHeadCell('FINDINGS', 1.1),
           const SizedBox(width: 32),
-          _buildHeadCell('FINDINGS', 1.2),
+          _buildHeadCell('BILL AMOUNT', 0.9),
           const SizedBox(width: 32),
-          _buildHeadCell('STATUS', 1),
+          _buildHeadCell('PAID', 1.0),
           const SizedBox(width: 32),
-          _buildHeadCell('ACTIONS', 0.6, Alignment.centerRight),
+          _buildHeadCell('STATUS', 0.8),
+          const SizedBox(width: 32),
+          _buildHeadCell('ACTIONS', 0.5, Alignment.centerRight),
         ],
       ),
     );
@@ -436,7 +465,7 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 2. METER ID - Flex 1
+          // 2. METER ID - Flex 1.0
           Expanded(
             flex: 10,
             child: Text(
@@ -446,18 +475,7 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 3. ADDRESS - Flex 1.5
-          Expanded(
-            flex: 15,
-            child: Text(
-              meter.address,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF475569)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 32),
-          // 4. PHONE - Flex 1
+          // 3. PHONE - Flex 1.0
           Expanded(
             flex: 10,
             child: Text(
@@ -467,9 +485,9 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 5. BRAND - Flex 1
+          // 4. BRAND - Flex 0.9
           Expanded(
-            flex: 10,
+            flex: 9,
             child: Text(
               meter.brand.toUpperCase(),
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF94A3B8), letterSpacing: 0.5),
@@ -477,21 +495,21 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 6. FINDINGS - Flex 1.2
+          // 5. FINDINGS - Flex 1.1
           Expanded(
-            flex: 12,
+            flex: 11,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: meter.findings.isNotEmpty && meter.findings.toLowerCase().contains('critical') 
+                color: (meter.findings ?? '').isNotEmpty && (meter.findings ?? '').toLowerCase().contains('critical') 
                     ? const Color(0xFFFEF2F2) 
                     : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                meter.findings.isEmpty ? 'No significant findings' : meter.findings,
+                (meter.findings ?? '').isEmpty ? 'No significant findings' : meter.findings!,
                 style: TextStyle(
-                  color: meter.findings.isNotEmpty && meter.findings.toLowerCase().contains('critical') 
+                  color: (meter.findings ?? '').isNotEmpty && (meter.findings ?? '').toLowerCase().contains('critical') 
                       ? const Color(0xFFB91C1C) 
                       : const Color(0xFF64748B),
                   fontSize: 11,
@@ -503,15 +521,35 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 7. STATUS - Flex 1
+          // 6. BILL AMOUNT - Flex 0.9
+          Expanded(
+            flex: 9,
+            child: Text(
+              'GHS ${(meter.debtAmount ?? 0.0).toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF334155)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 32),
+          // 7. PAID - Flex 1.0 (NEW)
           Expanded(
             flex: 10,
+            child: Text(
+              'GHS ${(meter.paidAmount ?? 0.0).toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF10B981)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 32),
+          // 8. STATUS - Flex 0.8
+          Expanded(
+            flex: 8,
             child: _buildStatusBadge(meter.status),
           ),
           const SizedBox(width: 32),
-          // 8. ACTIONS - Flex 0.6
+          // 9. ACTIONS - Flex 0.5
           Expanded(
-            flex: 6,
+            flex: 5,
             child: Container(
               alignment: Alignment.centerRight,
               child: PopupMenuButton<String>(
@@ -520,12 +558,27 @@ class DataManagementPage extends ConsumerWidget {
                 offset: const Offset(0, 40),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onSelected: (value) {
-                  if (value == 'summary') {
+                  if (value == 'edit') {
+                    ref.read(selectedMeterProvider.notifier).state = meter;
+                    ref.read(backofficePageProvider.notifier).state = BackofficePage.editInvestigation;
+                  } else if (value == 'summary') {
                     ref.read(selectedMeterProvider.notifier).state = meter;
                     ref.read(backofficePageProvider.notifier).state = BackofficePage.meterDetails;
+                  } else if (value == 'delete') {
+                    _showDeleteConfirmationDialog(context, ref, meter);
                   }
                 },
                 itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_note_rounded, size: 18, color: AppTheme.secondary),
+                        SizedBox(width: 12),
+                        Text('Edit Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'summary',
                     child: Row(
@@ -546,11 +599,216 @@ class DataManagementPage extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                        SizedBox(width: 12),
+                        Text('Delete Record', style: TextStyle(fontSize: 13, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Meter meter) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFFF8FAFC),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        contentPadding: EdgeInsets.zero,
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Premium Header
+              Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1E293B),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    ),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDE047).withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFFDE047).withValues(alpha: 0.3), width: 2),
+                        ),
+                        child: const Icon(Icons.delete_sweep_rounded, color: Color(0xFFFDE047), size: 54),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 20,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.gpp_maybe_rounded, color: Color(0xFFEF4444), size: 12),
+                          SizedBox(width: 4),
+                          Text('DANGER ZONE', style: TextStyle(color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Confirm Permanent Deletion',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 20),
+                    // Meter Info Chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.account_balance_rounded, color: Color(0xFF64748B), size: 16),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              '${meter.customerName} (${meter.id})',
+                              style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w700, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(color: const Color(0xFF64748B).withValues(alpha: 0.9), fontSize: 14, height: 1.6, fontWeight: FontWeight.w500),
+                        children: [
+                          const TextSpan(text: 'Warning! This action will '),
+                          const TextSpan(text: 'permanently erase ', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w900)),
+                          const TextSpan(text: 'all investigation records and historical data for this node. There is no recovery for this operation.'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5)),
+                          backgroundColor: Colors.white,
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            final deleteAction = ref.read(deleteMeterActionProvider);
+                            await deleteAction(meter.objectId!);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: Text('Record for ${meter.customerName} securely removed.')),
+                                    ],
+                                  ),
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  behavior: SnackBarBehavior.floating,
+                                  width: 400,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Failed to delete node. Encryption mismatch or link failure.'),
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  behavior: SnackBarBehavior.floating,
+                                  width: 400,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_forever_rounded, size: 20),
+                            SizedBox(width: 8),
+                            Text('Secure Delete', style: TextStyle(fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -610,20 +868,26 @@ class DataManagementPage extends ConsumerWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 12),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTableFooter(int total) {
+  Widget _buildTableFooter(int total, WidgetRef ref) {
+    final overallTotal = ref.watch(totalMetersCountProvider);
+    final isPlural = total != 1;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       color: Colors.white,
@@ -631,26 +895,28 @@ class DataManagementPage extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Showing 1 to $total of 1,284 nodes',
+            'Showing $total of $overallTotal node${isPlural ? 's' : ''}',
             style: TextStyle(color: AppTheme.textLight, fontSize: 13, fontWeight: FontWeight.w500),
           ),
-          Row(
-            children: [
-              _buildPagerArrow(Icons.chevron_left_rounded, false),
-              const SizedBox(width: 16),
-              _buildPagerNumber('1', true),
-              const SizedBox(width: 8),
-              _buildPagerNumber('2', false),
-              const SizedBox(width: 8),
-              _buildPagerNumber('3', false),
-              const SizedBox(width: 8),
-              const Text('...', style: TextStyle(color: Color(0xFF94A3B8))),
-              const SizedBox(width: 8),
-              _buildPagerNumber('321', false),
-              const SizedBox(width: 16),
-              _buildPagerArrow(Icons.chevron_right_rounded, true),
-            ],
-          ),
+          if (int.tryParse(overallTotal) != null && int.parse(overallTotal) > 10)
+            Row(
+              children: [
+                _buildPagerArrow(Icons.chevron_left_rounded, false),
+                const SizedBox(width: 16),
+                _buildPagerNumber('1', true),
+                const SizedBox(width: 8),
+                const Text('...', style: TextStyle(color: Color(0xFF94A3B8))),
+                const SizedBox(width: 8),
+                _buildPagerNumber(((int.parse(overallTotal) / 10).ceil()).toString(), false),
+                const SizedBox(width: 16),
+                _buildPagerArrow(Icons.chevron_right_rounded, true),
+              ],
+            )
+          else
+            const Text(
+              'End of records',
+              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, fontWeight: FontWeight.bold),
+            ),
         ],
       ),
     );
@@ -680,13 +946,13 @@ class DataManagementPage extends ConsumerWidget {
     return Icon(icon, color: enabled ? const Color(0xFFCBD5E1) : const Color(0xFFF1F5F9), size: 24);
   }
 
-  Widget _buildAnalyticsSection(BuildContext context) {
+  Widget _buildAnalyticsSection(BuildContext context, WidgetRef ref) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           flex: 2,
-          child: _buildConsumptionTrend(),
+          child: _buildConsumptionTrend(ref),
         ),
         const SizedBox(width: 32),
         Expanded(
@@ -697,7 +963,12 @@ class DataManagementPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildConsumptionTrend() {
+  Widget _buildConsumptionTrend(WidgetRef ref) {
+    final activity = ref.watch(meterActivityByDayProvider);
+    final days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    final maxActivity = activity.isEmpty ? 1.0 : activity.reduce((a, b) => a > b ? a : b);
+    final normalization = maxActivity == 0 ? 1.0 : maxActivity;
+
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -711,7 +982,7 @@ class DataManagementPage extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Regional Consumption Trend',
+                'Regional Activity Trend',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary),
               ),
               Container(
@@ -720,13 +991,13 @@ class DataManagementPage extends ConsumerWidget {
                   color: const Color(0xFFDCFCE7),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.trending_up, size: 14, color: Color(0xFF166534)),
-                    SizedBox(width: 4),
+                    const Icon(Icons.analytics_outlined, size: 14, color: Color(0xFF166534)),
+                    const SizedBox(width: 4),
                     Text(
-                      '+12.4%',
-                      style: TextStyle(color: Color(0xFF166534), fontSize: 12, fontWeight: FontWeight.bold),
+                      'LIVE DATA',
+                      style: TextStyle(color: const Color(0xFF166534).withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ],
                 ),
@@ -739,16 +1010,10 @@ class DataManagementPage extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBar('MON', 0.4),
-                _buildBar('TUE', 0.6),
-                _buildBar('WED', 0.5),
-                _buildBar('THU', 0.8),
-                _buildBar('FRI', 1.0, isActive: true),
-                _buildBar('SAT', 0.7),
-                _buildBar('SUN', 0.4),
-                _buildBar('TODAY', 0.9),
-              ],
+              children: List.generate(7, (index) {
+                final heightFactor = activity[index] / normalization;
+                return _buildBar(days[index], heightFactor, isActive: DateTime.now().weekday - 1 == index);
+              }),
             ),
           ),
         ],

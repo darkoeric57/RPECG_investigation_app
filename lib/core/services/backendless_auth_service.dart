@@ -175,8 +175,8 @@ class BackendlessAuthService {
         'staffId': staffId,
         'region': region,
         'accountType': accountType,
-        if (groupNo != null) 'groupNo': groupNo,
-        if (phone != null) 'phone': phone,
+        'groupNo': ?groupNo,
+        'phone': ?phone,
       });
 
       return await Backendless.userService.register(user);

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/backoffice_providers.dart';
-import '../../../../features/meters/domain/meter.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -140,8 +139,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             final targetWidth = (currentFlex / (totalBaseFlex + (_hoveredIndex != null ? 0 : 0))) * availableWidth;
             
             Widget card;
-            if (index == 0) card = _buildStatCard('Payment Report', isSyncing ? '...' : payment, Icons.payments_rounded, Colors.green, 'On Track', Colors.green, constraints, isHovered: _hoveredIndex == 0);
-            else if (index == 1) card = _buildStatCard('Total Meters', isSyncing ? '...' : total, Icons.speed_rounded, const Color(0xFF1E3A8A), '+2.4%', Colors.green, constraints, isHovered: _hoveredIndex == 1);
+            if (index == 0) {
+              card = _buildStatCard('Payment Report', isSyncing ? '...' : payment, Icons.payments_rounded, Colors.green, 'On Track', Colors.green, constraints, isHovered: _hoveredIndex == 0);
+            } else if (index == 1) card = _buildStatCard('Total Meters', isSyncing ? '...' : total, Icons.speed_rounded, const Color(0xFF1E3A8A), '+2.4%', Colors.green, constraints, isHovered: _hoveredIndex == 1);
             else if (index == 2) card = _buildStatCard('Active Investigators', isSyncing ? '...' : investigatorsCount, Icons.groups_rounded, const Color(0xFFD97706), 'Stable', const Color(0xFF64748B), constraints, isHovered: _hoveredIndex == 2);
             else if (index == 3) card = _buildStatCard('Pending Activation', isSyncing ? '...' : pending, Icons.assignment_rounded, const Color(0xFFD97706), 'Urgent', Colors.red, constraints, isHovered: _hoveredIndex == 3);
             else card = _buildStatCard(

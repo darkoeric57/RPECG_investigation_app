@@ -561,7 +561,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.description_rounded,
                     color: Colors.white, size: 24),

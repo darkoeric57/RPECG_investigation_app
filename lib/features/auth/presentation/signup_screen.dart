@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared_widgets/custom_button.dart';
 import '../../../shared_widgets/custom_text_field.dart';
 import '../../../core/services/backendless_auth_service.dart';
 import 'package:backendless_sdk/backendless_sdk.dart';
@@ -16,9 +15,9 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   String _selectedRegion = 'Head Office';
-  String _accountType = 'Technical';
+  final String _accountType = 'Technical';
   bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  final bool _obscureConfirmPassword = true;
   
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _staffIdController = TextEditingController();

@@ -10,9 +10,9 @@ import 'core/providers.dart';
 import 'core/config/app_config.dart';
 import 'core/services/backendless_auth_service.dart';
 import 'core/utils/web_utils.dart';
-// import 'main.reflectable.dart';
 
 import 'features/meters/domain/meter.dart';
+import 'features/backoffice/domain/installment.dart';
 import 'features/dashboard/domain/investigator.dart';
 
 // Google Sign In configuration
@@ -32,17 +32,34 @@ void main() async {
   Hive.registerAdapter(TariffActivityAdapter());
   Hive.registerAdapter(MeterPhaseAdapter());
   Hive.registerAdapter(MeteringTypeAdapter());
+  Hive.registerAdapter(InstallmentAdapter());
   Hive.registerAdapter(MeterAdapter());
   Hive.registerAdapter(InvestigatorStatusAdapter());
   Hive.registerAdapter(InvestigatorAdapter());
 
-  // Open Boxes
-  await Hive.openBox('settings');
-  await Hive.openBox<Meter>('meters_box');
-  await Hive.openBox<Investigator>('investigators_box');
+  // Open Boxes with aggressive Panic Clear & Timeout fallback
+  try {
+    await Future.wait([
+      Hive.openBox('settings'),
+      Hive.openBox<Meter>('meters_box'),
+      Hive.openBox<Investigator>('investigators_box'),
+    ]).timeout(const Duration(seconds: 4));
+  } catch (e) {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Hive init hung or failed. Forced clearing: $e');
+    try {
+      await Hive.deleteBoxFromDisk('settings');
+      await Hive.deleteBoxFromDisk('meters_box');
+      await Hive.deleteBoxFromDisk('investigators_box');
+    } catch (_) {}
+    
+    // Retry once with clean state
+    await Hive.openBox('settings');
+    await Hive.openBox<Meter>('meters_box');
+    await Hive.openBox<Investigator>('investigators_box');
+  }
   debugPrint('BACKENDLESS_AUTH_DEBUG: Hive boxes opened');
 
-  // Initialize Backendless (fast SDK call, no blocking network wait)
+  // Initialize Backendless
   try {
     await Backendless.initApp(
       applicationId: AppConfig.backendlessApplicationId,
@@ -69,10 +86,8 @@ void main() async {
   );
   debugPrint('BACKENDLESS_AUTH_DEBUG: runApp() executed');
 
-  // === Non-blocking background tasks (run AFTER UI is visible) ===
-  // Google Sign-In silent auth — slow network call, don't block UI
+  // === Non-blocking background tasks ===
   _googleSignIn.initialize(clientId: AppConfig.googleServerClientId).then((_) {
-    // attemptLightweightAuthentication returns Future? — use ?. to handle nullable
     _googleSignIn.attemptLightweightAuthentication()?.catchError((Object e) {
       debugPrint('BACKENDLESS_AUTH_DEBUG: Silent Google Sign-In skipped: $e');
       return null;
@@ -82,16 +97,12 @@ void main() async {
     return null;
   });
 
-  // Session restore — check credentials in background
   final authService = BackendlessAuthService();
   authService.isValidLogin().then((valid) async {
     if (valid) {
-      debugPrint('BACKENDLESS_AUTH_DEBUG: Valid login found, restoring session');
       final user = await authService.getCurrentUser();
       container.read(userProvider.notifier).state = user;
       debugPrint('BACKENDLESS_AUTH_DEBUG: User session restored: ${user?.email}');
-    } else {
-      debugPrint('BACKENDLESS_AUTH_DEBUG: No valid session found');
     }
   }).catchError((e) {
     debugPrint('BACKENDLESS_AUTH_DEBUG: Auth check failed (background): $e');
@@ -104,6 +115,7 @@ class BackofficeApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'Utility Manager - Backoffice',
@@ -111,7 +123,7 @@ class BackofficeApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
-      routerConfig: ref.watch(routerProvider),
+      routerConfig: router,
     );
   }
 }

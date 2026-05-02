@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'backoffice_sidebar.dart';
 import 'backoffice_topbar.dart';
+import 'premium_filter_drawer.dart';
 import '../providers/backoffice_providers.dart';
 
 // Placeholder Pages
@@ -14,6 +15,11 @@ import '../pages/map_view_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/billing_dashboard_page.dart';
 import '../pages/meter_details_summary_page.dart';
+import '../pages/edit_investigation_page.dart';
+import '../pages/billing_account_details_page.dart';
+import '../pages/billing_edit_account_page.dart';
+import '../pages/billing_status_history_page.dart';
+import '../pages/billing_schedule_page.dart';
 
 class BackofficeLayout extends ConsumerWidget {
   const BackofficeLayout({super.key});
@@ -24,6 +30,7 @@ class BackofficeLayout extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      endDrawer: const PremiumFilterDrawer(),
       body: Material( // Added Material context for web stability
         color: const Color(0xFFF8FAFC),
         child: SafeArea(
@@ -73,6 +80,16 @@ class BackofficeLayout extends ConsumerWidget {
           return const BillingDashboardPage();
         case BackofficePage.meterDetails:
           return const MeterDetailsSummaryPage();
+        case BackofficePage.editInvestigation:
+          return const EditInvestigationPage();
+        case BackofficePage.billingAccountDetails:
+          return const BillingAccountDetailsPage();
+        case BackofficePage.billingEditAccount:
+          return const BillingEditAccountPage();
+        case BackofficePage.billingStatusHistory:
+          return const BillingStatusHistoryPage();
+        case BackofficePage.billingSchedule:
+          return const BillingSchedulePage();
       }
     } catch (e) {
       return Center(

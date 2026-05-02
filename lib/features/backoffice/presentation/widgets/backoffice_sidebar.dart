@@ -17,7 +17,7 @@ class BackofficeSidebar extends ConsumerWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      width: isCollapsed ? 88 : 260,
+      width: isCollapsed ? 88 : 180,
       decoration: BoxDecoration(
         color: AppTheme.sidebarBg,
         border: Border(
@@ -41,7 +41,12 @@ class BackofficeSidebar extends ConsumerWidget {
                 _buildNavItem(ref, BackofficePage.fieldReports, Icons.description_rounded, 'Field Reports', isCollapsed, currentPage == BackofficePage.fieldReports),
                 _buildNavItem(ref, BackofficePage.notificationsChat, Icons.chat_bubble_rounded, 'Messages', isCollapsed, currentPage == BackofficePage.notificationsChat),
                 _buildNavItem(ref, BackofficePage.mapView, Icons.map_rounded, 'Live Map', isCollapsed, currentPage == BackofficePage.mapView),
-                _buildNavItem(ref, BackofficePage.billingDashboard, Icons.receipt_long_rounded, 'Billing Intelligence', isCollapsed, currentPage == BackofficePage.billingDashboard),
+                _buildNavItem(ref, BackofficePage.billingDashboard, Icons.receipt_long_rounded, 'Billing Intelligence', isCollapsed, [
+                  BackofficePage.billingDashboard,
+                  BackofficePage.billingAccountDetails,
+                  BackofficePage.billingEditAccount,
+                  BackofficePage.billingStatusHistory
+                ].contains(currentPage)),
                 _buildNavItem(ref, BackofficePage.settings, Icons.settings_rounded, 'Settings', isCollapsed, currentPage == BackofficePage.settings),
               ],
             ),
@@ -140,7 +145,7 @@ class BackofficeSidebar extends ConsumerWidget {
                         style: TextStyle(
                           color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.6),
                           fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: 15,
+                          fontSize: 12,
                         ),
                       ),
                     ),

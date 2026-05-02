@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import '../../backoffice/domain/installment.dart';
 
 part 'meter.g.dart';
 
@@ -47,6 +48,16 @@ class Meter {
   @HiveField(13) final MeterStatus status;
   @HiveField(14) final DateTime installationDate;
   @HiveField(15) final bool isSynced;
+  @HiveField(16) final String? findings;
+  @HiveField(17) final String? initialReadings;
+  @HiveField(18) final List<String> capturedImagePaths;
+  @HiveField(19) final String? capturedVideoPath;
+  @HiveField(20) final double? debtAmount;
+  @HiveField(21) final String? offenseType;
+  @HiveField(22) final DateTime? dateApprehended;
+  @HiveField(23) final double? paidAmount;
+  @HiveField(24) final String? objectId;
+  @HiveField(25) final List<Installment>? installments;
 
   Meter({
     required this.id,
@@ -64,130 +75,107 @@ class Meter {
     required this.type,
     required this.status,
     required this.installationDate,
-    this.findings = '',
-    this.initialReadings = '',
     this.isSynced = false,
+    this.findings,
+    this.initialReadings,
     this.capturedImagePaths = const [],
     this.capturedVideoPath,
-    this.debtAmount = 0.0,
-    this.offenseType = '',
+    this.debtAmount,
+    this.offenseType,
     this.dateApprehended,
+    this.paidAmount,
+    this.objectId,
+    this.installments,
   });
-
-  @HiveField(16) final String findings;
-  @HiveField(17) final String initialReadings;
-  @HiveField(18) final List<String> capturedImagePaths;
-  @HiveField(19) final String? capturedVideoPath;
-  @HiveField(20) final double debtAmount;
-  @HiveField(21) final String offenseType;
-  @HiveField(22) final DateTime? dateApprehended;
-
-  Meter copyWith({
-    String? id,
-    String? customerName,
-    String? address,
-    String? telephone,
-    String? tariffClass,
-    String? gpsCoordinates,
-    TariffActivity? tariffActivity,
-    String? geocode,
-    String? spnNumber,
-    String? brand,
-    String? rating,
-    MeterPhase? phase,
-    MeteringType? type,
-    MeterStatus? status,
-    DateTime? installationDate,
-    String? findings,
-    String? initialReadings,
-    List<String>? capturedImagePaths,
-    String? capturedVideoPath,
-    bool? isSynced,
-    double? debtAmount,
-    String? offenseType,
-    DateTime? dateApprehended,
-  }) {
-    return Meter(
-      id: id ?? this.id,
-      customerName: customerName ?? this.customerName,
-      address: address ?? this.address,
-      telephone: telephone ?? this.telephone,
-      tariffClass: tariffClass ?? this.tariffClass,
-      gpsCoordinates: gpsCoordinates ?? this.gpsCoordinates,
-      tariffActivity: tariffActivity ?? this.tariffActivity,
-      geocode: geocode ?? this.geocode,
-      spnNumber: spnNumber ?? this.spnNumber,
-      brand: brand ?? this.brand,
-      rating: rating ?? this.rating,
-      phase: phase ?? this.phase,
-      type: type ?? this.type,
-      status: status ?? this.status,
-      installationDate: installationDate ?? this.installationDate,
-      findings: findings ?? this.findings,
-      initialReadings: initialReadings ?? this.initialReadings,
-      capturedImagePaths: capturedImagePaths ?? this.capturedImagePaths,
-      capturedVideoPath: capturedVideoPath ?? this.capturedVideoPath,
-      isSynced: isSynced ?? this.isSynced,
-      debtAmount: debtAmount ?? this.debtAmount,
-      offenseType: offenseType ?? this.offenseType,
-      dateApprehended: dateApprehended ?? this.dateApprehended,
-    );
-  }
 
   factory Meter.fromMap(Map<dynamic, dynamic> map) {
     return Meter(
-      id: (map['meterId'] ?? map['objectId'] ?? '') as String,
-      customerName: (map['customerName'] ?? 'Unknown Customer') as String,
-      address: (map['address'] ?? 'No Address Provided') as String,
-      telephone: (map['telephone'] ?? '') as String,
-      tariffClass: (map['tariffClass'] ?? '') as String,
-      gpsCoordinates: (map['gpsCoordinates'] ?? '') as String,
-      tariffActivity: map['tariffActivity'] != null 
-          ? TariffActivity.values.byName(map['tariffActivity'] as String)
-          : TariffActivity.residential,
-      geocode: (map['geocode'] ?? '') as String,
-      spnNumber: (map['spnNumber'] ?? '') as String,
-      brand: (map['brand'] ?? '') as String,
-      rating: (map['rating'] ?? '') as String,
-      phase: map['phase'] != null 
-          ? MeterPhase.values.byName(map['phase'] as String)
-          : MeterPhase.single,
-      type: map['type'] != null 
-          ? MeteringType.values.byName(map['type'] as String)
-          : MeteringType.prepaid,
-      status: map['status'] != null 
-          ? _mapStatus(map['status'] as String)
-          : MeterStatus.paid,
+      id: (map['meterId'] ?? map['meterNumber'] ?? map['id'] ?? '').toString(),
+      customerName: (map['customerName'] ?? 'Unknown').toString(),
+      address: (map['address'] ?? 'No Address').toString(),
+      telephone: (map['phoneNumber'] ?? map['telephone'] ?? '').toString(),
+      tariffClass: (map['tariffClass'] ?? '').toString(),
+      gpsCoordinates: (map['gpsCoordinates'] ?? '').toString(),
+      tariffActivity: TariffActivity.values.firstWhere(
+        (e) => e.name == (map['tariffActivity'] ?? 'residential').toString().toLowerCase(),
+        orElse: () => TariffActivity.residential,
+      ),
+      geocode: (map['geocode'] ?? '').toString(),
+      spnNumber: (map['spnNumber'] ?? '').toString(),
+      brand: (map['meterBrand'] ?? map['brand'] ?? '').toString(),
+      rating: (map['meterRating'] ?? map['rating'] ?? '').toString(),
+      phase: MeterPhase.values.firstWhere(
+        (e) => e.name == (map['meterPhase'] ?? 'single').toString().toLowerCase(),
+        orElse: () => MeterPhase.single,
+      ),
+      type: MeteringType.values.firstWhere(
+        (e) => e.name == (map['meterType'] ?? 'prepaid').toString().toLowerCase(),
+        orElse: () => MeteringType.prepaid,
+      ),
+      status: MeterStatus.values.firstWhere(
+        (e) => e.name == (map['status'] ?? 'pending').toString().toLowerCase(),
+        orElse: () => MeterStatus.pending,
+      ),
       installationDate: map['installationDate'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int)
+          ? (map['installationDate'] is int 
+              ? DateTime.fromMillisecondsSinceEpoch(map['installationDate']) 
+              : DateTime.parse(map['installationDate'].toString()))
           : DateTime.now(),
-      findings: (map['findings'] ?? '') as String,
-      initialReadings: (map['initialReadings'] ?? '') as String,
-      capturedImagePaths: map['capturedImagePaths'] != null 
-          ? List<String>.from(map['capturedImagePaths'] as Iterable) 
-          : const [],
-      capturedVideoPath: map['capturedVideoPath'] as String?,
       isSynced: true,
-      debtAmount: (map['debtAmount'] ?? 0.0) as double,
-      offenseType: (map['offenseType'] ?? '') as String,
+      findings: map['findings']?.toString(),
+      initialReadings: map['initialReadings']?.toString(),
+      capturedImagePaths: map['imageUrls'] != null ? List<String>.from(map['imageUrls'] as List) : [],
+      capturedVideoPath: map['videoUrl']?.toString(),
+      debtAmount: map['debtAmount'] != null ? (map['debtAmount'] as num).toDouble() : null,
+      offenseType: map['offenseType']?.toString(),
       dateApprehended: map['dateApprehended'] != null 
-          ? DateTime.fromMillisecondsSinceEpoch(map['dateApprehended'] as int)
+          ? (map['dateApprehended'] is int 
+              ? DateTime.fromMillisecondsSinceEpoch(map['dateApprehended']) 
+              : DateTime.parse(map['dateApprehended'].toString()))
+          : null,
+      paidAmount: map['paidAmount'] != null ? (map['paidAmount'] as num).toDouble() : null,
+      objectId: map['objectId']?.toString(),
+      installments: map['installments'] != null 
+          ? (map['installments'] as List).map((i) => Installment.fromMap(Map<String, dynamic>.from(i as Map))).toList() 
           : null,
     );
   }
 
-  static MeterStatus _mapStatus(String statusStr) {
-    final s = statusStr.toLowerCase();
-    if (s == 'active' || s == 'operational') return MeterStatus.paid;
-    if (s == 'faulty' || s == 'critical failure' || s == 'critical') return MeterStatus.billed;
-    if (s == 'pending' || s == 'low throughput') return MeterStatus.pending;
-    if (s == 'scheduled' || s == 'billed' || s == 'paid') {
-      try {
-        return MeterStatus.values.byName(s);
-      } catch (_) {
-        return MeterStatus.paid;
-      }
-    }
-    return MeterStatus.paid;
+  Meter copyWith({
+    MeterStatus? status,
+    bool? isSynced,
+    String? findings,
+    double? debtAmount,
+    double? paidAmount,
+    List<Installment>? installments,
+  }) {
+    return Meter(
+      id: id,
+      customerName: customerName,
+      address: address,
+      telephone: telephone,
+      tariffClass: tariffClass,
+      gpsCoordinates: gpsCoordinates,
+      tariffActivity: tariffActivity,
+      geocode: geocode,
+      spnNumber: spnNumber,
+      brand: brand,
+      rating: rating,
+      phase: phase,
+      type: type,
+      status: status ?? this.status,
+      installationDate: installationDate,
+      isSynced: isSynced ?? this.isSynced,
+      findings: findings ?? this.findings,
+      initialReadings: initialReadings,
+      capturedImagePaths: capturedImagePaths,
+      capturedVideoPath: capturedVideoPath,
+      debtAmount: debtAmount ?? this.debtAmount,
+      offenseType: offenseType,
+      dateApprehended: dateApprehended,
+      paidAmount: paidAmount ?? this.paidAmount,
+      objectId: objectId,
+      installments: installments ?? this.installments,
+    );
   }
 }

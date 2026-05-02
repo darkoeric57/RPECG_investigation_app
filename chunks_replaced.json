@@ -1,0 +1,15 @@
+{
+  "name": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Wrapped the data table in a horizontal SingleChildScrollView with LayoutBuilder to prevent pixel overflow on smaller screens.\"",
+    "EndLine": "382",
+    "Instruction": "\"Replace the Column with a LayoutBuilder that contains a horizontal SingleChildScrollView and ConstrainedBox to fix pixel overflow.\"",
+    "ReplacementContent": "\"      child: LayoutBuilder(\\n        builder: (context, constraints) {\\n          return Scrollbar(\\n            child: SingleChildScrollView(\\n              scrollDirection: Axis.horizontal,\\n              child: ConstrainedBox(\\n                constrai\n<truncated 1310 bytes>",
+    "StartLine": "365",
+    "TargetContent": "\"      child: Column(\\n        children: [\\n          _buildTableHead(),\\n          const Divider(height: 1, color: Color(0xFFF1F5F9)),\\n          metersAsync.when(\\n            loading: () => const SizedBox(height: 400, child: Center(child: CircularProgre\n<truncated 608 bytes>",
+    "TargetFile": "\"c:\\\\Users\\\\darko\\\\OneDrive\\\\Desktop\\\\Antigravity Projects\\\\RPECG_investigation_app\\\\files\\\\lib\\\\features\\\\backoffice\\\\presentation\\\\pages\\\\data_management_page.dart\"",
+    "toolAction": "\"Replacing table code to fix overflow\"",
+    "toolSummary": "\"Edit data_management_page.dart\""
+  }
+}
