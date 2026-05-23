@@ -664,17 +664,30 @@ class _SearchAndFilter extends ConsumerWidget {
 }
 
 // ─── Ledger Table ─────────────────────────────────────────────────────────────
-class _LedgerTable extends StatelessWidget {
+class _LedgerTable extends StatefulWidget {
   final List<AccountLedger> ledgers;
   final RevenueAnalysisSummary? summary;
   const _LedgerTable({required this.ledgers, required this.summary});
 
   @override
+  State<_LedgerTable> createState() => _LedgerTableState();
+}
+
+class _LedgerTableState extends State<_LedgerTable> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (summary == null) {
-      return _EmptyState();
+    if (widget.summary == null) {
+      return const _EmptyState();
     }
-    if (ledgers.isEmpty) {
+    if (widget.ledgers.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 60),
@@ -686,7 +699,7 @@ class _LedgerTable extends StatelessWidget {
 
     const headers = [
       'Customer Name', 'Meter Number', 'Account Number', 'Total Amount',
-      'Amount Paid', 'Fraud Bill Status', 'Fraud Type', 'Outstanding Balance',
+      'Amount Paid', 'Fraud Bill Status', 'Fraud Type', 'Outstanding',
       'Tariff', 'Status',
     ];
 
@@ -699,60 +712,66 @@ class _LedgerTable extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
-            child: Table(
-              columnWidths: const {
-                0: FixedColumnWidth(180),
-                1: FixedColumnWidth(160),
-                2: FixedColumnWidth(160),
-                3: FixedColumnWidth(150),
-                4: FixedColumnWidth(150),
-                5: FixedColumnWidth(180),
-                6: FixedColumnWidth(160), // Fraud Type
-                7: FixedColumnWidth(160), // Outstanding Balance
-                8: FixedColumnWidth(140), // Tariff
-                9: FixedColumnWidth(130), // Status
-              },
-              children: [
-                // Header row
-                TableRow(
-                  decoration: const BoxDecoration(color: _kPrimary),
-                  children: headers.map((h) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
-                  )).toList(),
-                ),
-                // Data rows
-                ...ledgers.asMap().entries.map((e) {
-                  final i = e.key;
-                  final l = e.value;
-                  final bg = l.isSettled
-                      ? const Color(0xFFF0FDF4)
-                      : (!l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white));
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
+              child: Table(
+                columnWidths: const {
+                  0: FixedColumnWidth(160),
+                  1: FixedColumnWidth(120),
+                  2: FixedColumnWidth(120),
+                  3: FixedColumnWidth(110),
+                  4: FixedColumnWidth(110),
+                  5: FixedColumnWidth(130),
+                  6: FixedColumnWidth(120),
+                  7: FixedColumnWidth(110),
+                  8: FixedColumnWidth(110),
+                  9: FixedColumnWidth(95),
+                },
+                children: [
+                  // Header row
+                  TableRow(
+                    decoration: const BoxDecoration(color: _kPrimary),
+                    children: headers.map((h) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
+                    )).toList(),
+                  ),
+                  // Data rows
+                  ...widget.ledgers.asMap().entries.map((e) {
+                    final i = e.key;
+                    final l = e.value;
+                    final bg = l.isSettled
+                        ? const Color(0xFFF0FDF4)
+                        : (!l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white));
 
-                  return TableRow(
-                    decoration: BoxDecoration(
-                      color: bg,
-                      border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
-                    ),
-                    children: [
-                      _cell(l.customerName),
-                      _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
-                      _cell(l.accountNumber, mono: true),
-                      _cell(_currency.format(l.totalBilled), bold: true),
-                      _cell(_currency.format(l.totalPaid), color: _kSettled),
-                      _fraudCell(l.fraudBillStatus),
-                      _fraudCell(l.fraudType),
-                      _outstandingCell(l.netOutstanding),
-                      _cell(l.tariff),
-                      _statusBadge(l.settlementStatus, l.isAccountMeterValid),
-                    ],
-                  );
-                }),
-              ],
+                    return TableRow(
+                      decoration: BoxDecoration(
+                        color: bg,
+                        border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
+                      ),
+                      children: [
+                        _cell(l.customerName),
+                        _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
+                        _cell(l.accountNumber, mono: true),
+                        _cell(_currency.format(l.totalBilled), bold: true),
+                        _cell(_currency.format(l.totalPaid), color: _kSettled),
+                        _fraudCell(l.fraudBillStatus),
+                        _fraudCell(l.fraudType),
+                        _outstandingCell(l.netOutstanding),
+                        _cell(l.tariff),
+                        _statusBadge(l.settlementStatus, l.isAccountMeterValid),
+                      ],
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         ),
@@ -828,6 +847,8 @@ class _LedgerTable extends StatelessWidget {
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
+  const _EmptyState({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Container(

@@ -686,17 +686,30 @@ class _SearchAndFilter extends ConsumerWidget {
 }
 
 // ─── Ledger Table ─────────────────────────────────────────────────────────────
-class _LedgerTable extends StatelessWidget {
+class _LedgerTable extends StatefulWidget {
   final List<AccountLedger> ledgers;
   final RevenueAnalysisSummary? summary;
   const _LedgerTable({required this.ledgers, required this.summary});
 
   @override
+  State<_LedgerTable> createState() => _LedgerTableState();
+}
+
+class _LedgerTableState extends State<_LedgerTable> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (summary == null) {
+    if (widget.summary == null) {
       return const _EmptyState();
     }
-    if (ledgers.isEmpty) {
+    if (widget.ledgers.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 60),
@@ -707,8 +720,8 @@ class _LedgerTable extends StatelessWidget {
     }
 
     const headers = [
-      'Customer Name', 'Meter Number', 'Account Number', 'Total Consumption (kWh)',
-      'Avg Consumption (kWh)', 'Min Consumption (kWh)', 'Max Consumption (kWh)',
+      'Customer Name', 'Meter Number', 'Account Number', 'Total Cons. (kWh)',
+      'Avg Cons. (kWh)', 'Min Cons. (kWh)', 'Max Cons. (kWh)',
       'Tariff', 'Status',
     ];
 
@@ -721,68 +734,74 @@ class _LedgerTable extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
-            child: Table(
-              columnWidths: const {
-                0: FixedColumnWidth(180),
-                1: FixedColumnWidth(160),
-                2: FixedColumnWidth(160),
-                3: FixedColumnWidth(180),
-                4: FixedColumnWidth(180),
-                5: FixedColumnWidth(180),
-                6: FixedColumnWidth(180),
-                7: FixedColumnWidth(140),
-                8: FixedColumnWidth(130),
-              },
-              children: [
-                // Header row
-                TableRow(
-                  decoration: const BoxDecoration(color: _kPrimary),
-                  children: headers.map((h) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
-                  )).toList(),
-                ),
-                // Data rows
-                ...ledgers.asMap().entries.map((e) {
-                  final i = e.key;
-                  final l = e.value;
-                  final bg = !l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white);
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
+              child: Table(
+                columnWidths: const {
+                  0: FixedColumnWidth(160),
+                  1: FixedColumnWidth(120),
+                  2: FixedColumnWidth(120),
+                  3: FixedColumnWidth(130),
+                  4: FixedColumnWidth(130),
+                  5: FixedColumnWidth(130),
+                  6: FixedColumnWidth(130),
+                  7: FixedColumnWidth(120),
+                  8: FixedColumnWidth(100),
+                },
+                children: [
+                  // Header row
+                  TableRow(
+                    decoration: const BoxDecoration(color: _kPrimary),
+                    children: headers.map((h) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
+                    )).toList(),
+                  ),
+                  // Data rows
+                  ...widget.ledgers.asMap().entries.map((e) {
+                    final i = e.key;
+                    final l = e.value;
+                    final bg = !l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white);
 
-                  final uniqueCycles = <RevenueRecord>[];
-                  for (final cycle in l.cycles) {
-                    if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
-                      uniqueCycles.add(cycle);
+                    final uniqueCycles = <RevenueRecord>[];
+                    for (final cycle in l.cycles) {
+                      if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+                        uniqueCycles.add(cycle);
+                      }
                     }
-                  }
-                  final consumptionList = uniqueCycles.map((c) => c.consumption).toList();
-                  final double total = l.totalConsumption;
-                  final double min = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a < b ? a : b);
-                  final double max = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a > b ? a : b);
-                  final double avg = consumptionList.isEmpty ? 0.0 : total / consumptionList.length;
+                    final consumptionList = uniqueCycles.map((c) => c.consumption).toList();
+                    final double total = l.totalConsumption;
+                    final double min = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a < b ? a : b);
+                    final double max = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a > b ? a : b);
+                    final double avg = consumptionList.isEmpty ? 0.0 : total / consumptionList.length;
 
-                  return TableRow(
-                    decoration: BoxDecoration(
-                      color: bg,
-                      border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
-                    ),
-                    children: [
-                      _cell(l.customerName),
-                      _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
-                      _cell(l.accountNumber, mono: true),
-                      _cell('${total.toStringAsFixed(1)} kWh', bold: true, color: _kPrimary),
-                      _cell('${avg.toStringAsFixed(1)} kWh'),
-                      _cell('${min.toStringAsFixed(1)} kWh'),
-                      _cell('${max.toStringAsFixed(1)} kWh'),
-                      _cell(l.tariff),
-                      _statusBadge(l.settlementStatus, l.isAccountMeterValid),
-                    ],
-                  );
-                }),
-              ],
+                    return TableRow(
+                      decoration: BoxDecoration(
+                        color: bg,
+                        border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
+                      ),
+                      children: [
+                        _cell(l.customerName),
+                        _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
+                        _cell(l.accountNumber, mono: true),
+                        _cell('${total.toStringAsFixed(1)} kWh', bold: true, color: _kPrimary),
+                        _cell('${avg.toStringAsFixed(1)} kWh'),
+                        _cell('${min.toStringAsFixed(1)} kWh'),
+                        _cell('${max.toStringAsFixed(1)} kWh'),
+                        _cell(l.tariff),
+                        _statusBadge(l.settlementStatus, l.isAccountMeterValid),
+                      ],
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         ),

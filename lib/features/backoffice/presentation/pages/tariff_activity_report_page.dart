@@ -668,17 +668,30 @@ class _SearchAndFilter extends ConsumerWidget {
 }
 
 // ─── Ledger Table ─────────────────────────────────────────────────────────────
-class _LedgerTable extends StatelessWidget {
+class _LedgerTable extends StatefulWidget {
   final List<AccountLedger> ledgers;
   final RevenueAnalysisSummary? summary;
   const _LedgerTable({required this.ledgers, required this.summary});
 
   @override
+  State<_LedgerTable> createState() => _LedgerTableState();
+}
+
+class _LedgerTableState extends State<_LedgerTable> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (summary == null) {
+    if (widget.summary == null) {
       return const _EmptyState();
     }
-    if (ledgers.isEmpty) {
+    if (widget.ledgers.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 60),
@@ -690,7 +703,7 @@ class _LedgerTable extends StatelessWidget {
 
     const headers = [
       'Customer Name', 'Account Number', 'Meter Number', 'Tariff Class',
-      'Total Billed', 'Total Paid', 'Collection Efficiency', 'Status',
+      'Total Billed', 'Total Paid', 'Collection Eff.', 'Status',
     ];
 
     return Container(
@@ -702,56 +715,62 @@ class _LedgerTable extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
-            child: Table(
-              columnWidths: const {
-                0: FixedColumnWidth(180),
-                1: FixedColumnWidth(160),
-                2: FixedColumnWidth(160),
-                3: FixedColumnWidth(160),
-                4: FixedColumnWidth(150),
-                5: FixedColumnWidth(150),
-                6: FixedColumnWidth(180),
-                7: FixedColumnWidth(130),
-              },
-              children: [
-                // Header row
-                TableRow(
-                  decoration: const BoxDecoration(color: _kPrimary),
-                  children: headers.map((h) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
-                  )).toList(),
-                ),
-                // Data rows
-                ...ledgers.asMap().entries.map((e) {
-                  final i = e.key;
-                  final l = e.value;
-                  final bg = !l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white);
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 80),
+              child: Table(
+                columnWidths: const {
+                  0: FixedColumnWidth(160),
+                  1: FixedColumnWidth(120),
+                  2: FixedColumnWidth(120),
+                  3: FixedColumnWidth(120),
+                  4: FixedColumnWidth(120),
+                  5: FixedColumnWidth(120),
+                  6: FixedColumnWidth(130),
+                  7: FixedColumnWidth(100),
+                },
+                children: [
+                  // Header row
+                  TableRow(
+                    decoration: const BoxDecoration(color: _kPrimary),
+                    children: headers.map((h) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Text(h, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5)),
+                    )).toList(),
+                  ),
+                  // Data rows
+                  ...widget.ledgers.asMap().entries.map((e) {
+                    final i = e.key;
+                    final l = e.value;
+                    final bg = !l.isAccountMeterValid ? const Color(0xFFFFFBEB) : (i.isOdd ? const Color(0xFFF8FAFC) : Colors.white);
 
-                  final double efficiency = l.totalBilled > 0 ? (l.totalPaid / l.totalBilled) * 100 : 100.0;
+                    final double efficiency = l.totalBilled > 0 ? (l.totalPaid / l.totalBilled) * 100 : 100.0;
 
-                  return TableRow(
-                    decoration: BoxDecoration(
-                      color: bg,
-                      border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
-                    ),
-                    children: [
-                      _cell(l.customerName),
-                      _cell(l.accountNumber, mono: true),
-                      _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
-                      _cell(l.tariff, bold: true),
-                      _cell(_currency.format(l.totalBilled)),
-                      _cell(_currency.format(l.totalPaid), color: _kSettled),
-                      _cell('${_pct.format(efficiency)}%', bold: true, color: _kPrimary),
-                      _statusBadge(l.settlementStatus, l.isAccountMeterValid),
-                    ],
-                  );
-                }),
-              ],
+                    return TableRow(
+                      decoration: BoxDecoration(
+                        color: bg,
+                        border: const Border(top: BorderSide(color: _kBorder, width: 0.5)),
+                      ),
+                      children: [
+                        _cell(l.customerName),
+                        _cell(l.accountNumber, mono: true),
+                        _cell(l.meterNumber, mono: true, strike: !l.isAccountMeterValid),
+                        _cell(l.tariff, bold: true),
+                        _cell(_currency.format(l.totalBilled)),
+                        _cell(_currency.format(l.totalPaid), color: _kSettled),
+                        _cell('${_pct.format(efficiency)}%', bold: true, color: _kPrimary),
+                        _statusBadge(l.settlementStatus, l.isAccountMeterValid),
+                      ],
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         ),
