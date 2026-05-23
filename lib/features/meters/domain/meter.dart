@@ -41,7 +41,6 @@ class Meter {
   @HiveField(6) final TariffActivity tariffActivity;
   @HiveField(7) final String geocode;
   @HiveField(8) final String spnNumber;
-  @HiveField(9) final String brand;
   @HiveField(10) final String rating;
   @HiveField(11) final MeterPhase phase;
   @HiveField(12) final MeteringType type;
@@ -69,7 +68,6 @@ class Meter {
     required this.tariffActivity,
     required this.geocode,
     required this.spnNumber,
-    required this.brand,
     required this.rating,
     required this.phase,
     required this.type,
@@ -89,6 +87,12 @@ class Meter {
   });
 
   factory Meter.fromMap(Map<dynamic, dynamic> map) {
+    // Helper for safe list conversion
+    List<String> safeStringList(dynamic value) {
+      if (value == null || value is! List) return [];
+      return value.map((e) => e?.toString() ?? '').toList();
+    }
+
     return Meter(
       id: (map['meterId'] ?? map['meterNumber'] ?? map['id'] ?? '').toString(),
       customerName: (map['customerName'] ?? 'Unknown').toString(),
@@ -102,7 +106,6 @@ class Meter {
       ),
       geocode: (map['geocode'] ?? '').toString(),
       spnNumber: (map['spnNumber'] ?? '').toString(),
-      brand: (map['meterBrand'] ?? map['brand'] ?? '').toString(),
       rating: (map['meterRating'] ?? map['rating'] ?? '').toString(),
       phase: MeterPhase.values.firstWhere(
         (e) => e.name == (map['meterPhase'] ?? 'single').toString().toLowerCase(),
@@ -118,25 +121,27 @@ class Meter {
       ),
       installationDate: map['installationDate'] != null 
           ? (map['installationDate'] is int 
-              ? DateTime.fromMillisecondsSinceEpoch(map['installationDate']) 
-              : DateTime.parse(map['installationDate'].toString()))
+              ? DateTime.fromMillisecondsSinceEpoch(map['installationDate'] as int) 
+              : DateTime.tryParse(map['installationDate'].toString()) ?? DateTime.now())
           : DateTime.now(),
       isSynced: true,
       findings: map['findings']?.toString(),
       initialReadings: map['initialReadings']?.toString(),
-      capturedImagePaths: map['imageUrls'] != null ? List<String>.from(map['imageUrls'] as List) : [],
+      capturedImagePaths: safeStringList(map['imageUrls']),
       capturedVideoPath: map['videoUrl']?.toString(),
       debtAmount: map['debtAmount'] != null ? (map['debtAmount'] as num).toDouble() : null,
       offenseType: map['offenseType']?.toString(),
       dateApprehended: map['dateApprehended'] != null 
           ? (map['dateApprehended'] is int 
-              ? DateTime.fromMillisecondsSinceEpoch(map['dateApprehended']) 
-              : DateTime.parse(map['dateApprehended'].toString()))
+              ? DateTime.fromMillisecondsSinceEpoch(map['dateApprehended'] as int) 
+              : DateTime.tryParse(map['dateApprehended'].toString()))
           : null,
       paidAmount: map['paidAmount'] != null ? (map['paidAmount'] as num).toDouble() : null,
       objectId: map['objectId']?.toString(),
-      installments: map['installments'] != null 
-          ? (map['installments'] as List).map((i) => Installment.fromMap(Map<String, dynamic>.from(i as Map))).toList() 
+      installments: map['installments'] != null && map['installments'] is List
+          ? (map['installments'] as List)
+              .map((i) => Installment.fromMap(Map<String, dynamic>.from(i as Map)))
+              .toList() 
           : null,
     );
   }
@@ -159,7 +164,6 @@ class Meter {
       tariffActivity: tariffActivity,
       geocode: geocode,
       spnNumber: spnNumber,
-      brand: brand,
       rating: rating,
       phase: phase,
       type: type,

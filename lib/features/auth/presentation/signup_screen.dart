@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_text_field.dart';
-import '../../../core/services/backendless_auth_service.dart';
-import 'package:backendless_sdk/backendless_sdk.dart';
+import '../../../core/services/firebase_auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -420,7 +420,7 @@ Widget _buildInputLabel(String label) {
     );
 
     try {
-      final authService = BackendlessAuthService();
+      final authService = FirebaseAuthService();
       await authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -443,7 +443,7 @@ Widget _buildInputLabel(String label) {
       if (mounted) {
         Navigator.pop(context); // Remove loading
         String message = e.toString();
-        if (e is BackendlessException) {
+        if (e is FirebaseAuthException) {
           message = e.message ?? 'Unknown error';
         }
         ScaffoldMessenger.of(context).showSnackBar(

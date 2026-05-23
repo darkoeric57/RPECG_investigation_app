@@ -302,7 +302,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
     final extraMessages =
         ref.watch(chatMessagesProvider)[selectedIndex] ?? [];
     final user = ref.watch(userProvider);
-    final senderName = (user?.getProperty('name') as String?) ?? 'You';
+    final senderName = user?.displayName ?? 'You';
 
     return Column(
       children: [

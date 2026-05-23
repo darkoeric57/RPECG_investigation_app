@@ -41,7 +41,6 @@ class PdfService {
             _buildSectionTitle('TECHNICAL SPECIFICATIONS'),
             _buildInfoTable([
               ['Meter ID', meter.id],
-              ['Brand', meter.brand],
               ['Rating', meter.rating],
               ['Phase', meter.phase.name.toUpperCase()],
               ['Metering Type', meter.type.name.toUpperCase()],

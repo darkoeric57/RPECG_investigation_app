@@ -3,7 +3,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class Backendless {
   static final UserService userService = UserService();

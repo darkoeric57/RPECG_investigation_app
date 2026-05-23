@@ -310,30 +310,13 @@ class AddMeterStepper extends ConsumerWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSelectionCard(
-                        Icons.factory_outlined,
-                        'METER BRAND',
-                        state.meterBrand.isEmpty
-                            ? 'Select Brand'
-                            : state.meterBrand,
-                        onTap: () => _showBrandPicker(context, notifier),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildSelectionCard(
-                        Icons.speed,
-                        'READINGS',
-                        state.initialReadings.isEmpty
-                            ? 'Initial KWh'
-                            : state.initialReadings,
-                        onTap: () => _showReadingsInput(context, notifier),
-                      ),
-                    ),
-                  ],
+                _buildFullWidthSelectionCard(
+                  Icons.speed,
+                  'READINGS',
+                  state.initialReadings.isEmpty
+                      ? 'Initial KWh'
+                      : state.initialReadings,
+                  onTap: () => _showReadingsInput(context, notifier),
                 ),
                 const SizedBox(height: 12),
                 _buildFindingsSelector(context, state.findings, notifier),
@@ -614,7 +597,6 @@ class AddMeterStepper extends ConsumerWidget {
           title: 'Meter Technical Info',
           rows: [
             _buildReviewRow('Meter ID', state.meterId),
-            _buildReviewRow('Meter Brand', state.meterBrand),
             _buildReviewRow('Meter Rating', state.meterRating),
             _buildReviewRow('Initial Readings', state.initialReadings),
             _buildReviewRow('Tariff Class', state.tariffClass, isLabel: true),
@@ -1604,7 +1586,6 @@ class AddMeterStepper extends ConsumerWidget {
                               : TariffActivity.industrial),
                     geocode: state.geocode,
                     spnNumber: state.spnNumber,
-                    brand: state.meterBrand,
                     rating: state.meterRating,
                     phase: state.meterPhase == '1-Phase'
                         ? MeterPhase.single
@@ -1851,37 +1832,6 @@ class AddMeterStepper extends ConsumerWidget {
     );
   }
 
-  void _showBrandPicker(BuildContext context, AddMeterNotifier notifier) {
-    final brands = [
-      'Landis+Gyr',
-      'Itron',
-      'Holley',
-      'Hexing',
-      'Clou',
-      'Wasion',
-      'Nuri',
-      'Others',
-    ];
-
-    _showGenericPicker(
-      context,
-      title: 'METER BRAND',
-      subtitle: 'Select manufacturer',
-      items: brands,
-      onSelected: (item) {
-        if (item == 'Others') {
-          _showCustomInput(
-            context,
-            'Other Brand',
-            'Enter meter brand',
-            (val) => notifier.updateMeterBrand(val),
-          );
-        } else {
-          notifier.updateMeterBrand(item);
-        }
-      },
-    );
-  }
 
   void _showRatingPicker(BuildContext context, AddMeterNotifier notifier) {
     final ratings = ['5 (60)A', '10 (100)A', '20 (80)A', '40 (100)A', 'Others'];

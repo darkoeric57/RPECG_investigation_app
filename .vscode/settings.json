@@ -25,5 +25,6 @@
     ],
     "java.import.gradle.java.home": "C:\\Program Files\\Java\\jdk-21",
     "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-21",
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "cmake.sourceDirectory": "C:/Users/darko/OneDrive/Desktop/Antigravity Projects/RPECG_investigation_app/files/windows"
 }

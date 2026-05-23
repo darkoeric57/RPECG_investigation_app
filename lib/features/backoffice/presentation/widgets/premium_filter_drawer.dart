@@ -33,14 +33,6 @@ class PremiumFilterDrawer extends ConsumerWidget {
                   _buildStatusChips(ref),
                   const SizedBox(height: 40),
                   
-                  _buildSectionTitle('METER BRANDS'),
-                  const SizedBox(height: 16),
-                  _buildMultiSelectSection(
-                    ref: ref,
-                    provider: meterBrandFilterSetProvider,
-                    availableValues: ref.watch(availableFilterValuesProvider).brands,
-                    emptyHint: 'No brands found in current data',
-                  ),
                   const SizedBox(height: 40),
 
                   _buildSectionTitle('FIELD FINDINGS'),
@@ -218,7 +210,6 @@ class PremiumFilterDrawer extends ConsumerWidget {
             child: OutlinedButton(
               onPressed: () {
                 ref.read(meterStatusFilterSetProvider.notifier).state = {};
-                ref.read(meterBrandFilterSetProvider.notifier).state = {};
                 ref.read(meterFindingsFilterSetProvider.notifier).state = {};
               },
               style: OutlinedButton.styleFrom(

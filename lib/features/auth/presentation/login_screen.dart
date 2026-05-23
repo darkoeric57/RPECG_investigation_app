@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared_widgets/custom_text_field.dart';
 import '../../../core/services/biometric_service.dart';
-import '../../../core/services/backendless_auth_service.dart';
-import 'package:backendless_sdk/backendless_sdk.dart';
+import '../../../core/services/firebase_auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   }
 
   Future<void> _checkExistingSession() async {
-    final authService = BackendlessAuthService();
+    final authService = FirebaseAuthService();
     try {
       final isValid = await authService.isValidLogin();
         if (isValid && mounted) {
@@ -99,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
   Future<void> _handleBiometricLogin() async {
     debugPrint('BIOMETRIC_DEBUG: Starting handleBiometricLogin...');
-    final authService = BackendlessAuthService();
+    final authService = FirebaseAuthService();
     
     // Check if we actually have credentials
     final hasCreds = await authService.hasOfflineCredentials();
@@ -107,7 +107,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     debugPrint('BIOMETRIC_DEBUG: hasCreds: $hasCreds, biometricEnabled: $biometricEnabled');
     
     if (!hasCreds) {
-       if (mounted) {
+       if (mounted && !kIsWeb) {
          ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Please login with password once to enable biometric offline login.'))
          );
@@ -160,7 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     }
   }
 
-  Future<void> _showBiometricPrompt(BackendlessAuthService authService) async {
+  Future<void> _showBiometricPrompt(FirebaseAuthService authService) async {
     return showDialog(
        context: context,
        barrierDismissible: false,
@@ -206,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     );
 
     try {
-      final authService = BackendlessAuthService();
+      final authService = FirebaseAuthService();
       final user = await authService.login(_emailController.text.trim(), _passwordController.text);
       
       if (mounted) {
@@ -224,19 +224,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Remove loading
-        String message = e.toString();
-        if (e is BackendlessException) {
-          if (e.code == '3064') {
-            message = 'This account is already logged in on another device or session. Please logout there first or check your Backendless settings.';
-          } else {
-            message = e.message ?? 'Unknown error';
+        String message;
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'invalid-credential':
+            case 'user-not-found':
+            case 'wrong-password':
+              message = 'The email or password you entered is incorrect. Please try again.';
+              break;
+            case 'invalid-email':
+              message = 'The email address is not valid. Please check and try again.';
+              break;
+            case 'user-disabled':
+              message = 'This account has been disabled. Please contact your administrator.';
+              break;
+            case 'too-many-requests':
+              message = 'Too many failed login attempts. Please wait a few minutes and try again.';
+              break;
+            case 'network-request-failed':
+              message = 'No internet connection. Please check your network and try again.';
+              break;
+            case 'operation-not-allowed':
+              message = 'Email/password sign-in is not enabled. Please contact your administrator.';
+              break;
+            default:
+              message = e.message ?? 'An unexpected error occurred. Please try again.';
           }
+        } else {
+          message = 'An unexpected error occurred. Please try again.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login failed: $message'),
+            content: Text(message),
             backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
           ),
         );
       }

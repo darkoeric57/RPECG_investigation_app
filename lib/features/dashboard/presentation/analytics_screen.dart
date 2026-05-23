@@ -78,11 +78,7 @@ class AnalyticsScreen extends ConsumerWidget {
         _buildStatusChart(statusStats),
         const SizedBox(height: 32),
 
-        // Brand Breakdown Section
-        _buildSectionTitle('TOP METER BRANDS'),
-        const SizedBox(height: 16),
-        _buildBrandBreakdown(meters),
-        const SizedBox(height: 32),
+
 
         // Sync Progress Overview
         _buildSectionTitle('SYNC STATUS'),
@@ -424,55 +420,7 @@ class AnalyticsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBrandBreakdown(List<Meter> meters) {
-    if (meters.isEmpty) return const SizedBox.shrink();
-    
-    final brandCounts = <String, int>{};
-    for (var m in meters) {
-      final brand = m.brand.isEmpty ? 'Unknown' : m.brand;
-      brandCounts[brand] = (brandCounts[brand] ?? 0) + 1;
-    }
 
-    final sortedBrands = brandCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    
-    final topBrands = sortedBrands.take(5).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        children: topBrands.map((entry) {
-          final percentage = (entry.value / meters.length * 100).toInt();
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(color: AppTheme.backgroundLight, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.bolt, size: 16, color: AppTheme.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(entry.key.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 2),
-                      Text('${entry.value} Investigations', style: const TextStyle(fontSize: 10, color: AppTheme.textLight)),
-                    ],
-                  ),
-                ),
-                Text('$percentage%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
 
   Widget _buildLegendItem(String label, Color color, int count) {
     return Padding(

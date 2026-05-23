@@ -11,14 +11,10 @@ class BackofficeTopBar extends ConsumerWidget {
     final user = ref.watch(userProvider);
     final currentPage = ref.watch(backofficePageProvider);
 
-    final String userName =
-        (user?.getProperty('name') as String?)?.trim().isNotEmpty == true
-            ? user!.getProperty('name') as String
-            : _extractNameFromEmail(user?.email);
+    final String userName = user?.displayName ?? _extractNameFromEmail(user?.email);
 
     // Extract account type for the profile section
-    final String rawAccountType =
-        (user?.getProperty('accountType') as String?)?.trim() ?? '';
+    final String rawAccountType = 'Staff';
     final String accountType =
         rawAccountType.isNotEmpty && rawAccountType.toUpperCase() != 'DEFAULT'
             ? rawAccountType
@@ -26,38 +22,24 @@ class BackofficeTopBar extends ConsumerWidget {
 
     final String initials = _getInitials(userName);
 
-    String getPageTitle(BackofficePage page) {
-      switch (page) {
-        case BackofficePage.dashboard:
-          return 'Overview';
-        case BackofficePage.dataManagement:
-          return 'Import Data';
-        case BackofficePage.investigatorAssignments:
-          return 'Investigators';
-        case BackofficePage.fieldReports:
-          return 'Reports';
-        case BackofficePage.notificationsChat:
-          return 'Chats';
-        case BackofficePage.mapView:
-          return 'Map View';
-        case BackofficePage.settings:
-          return 'Settings';
-        case BackofficePage.billingDashboard:
-          return 'Billing Intelligence';
-        case BackofficePage.meterDetails:
-          return 'Investigation Summary';
-        case BackofficePage.editInvestigation:
-          return 'Edit Investigation';
-        case BackofficePage.billingAccountDetails:
-          return 'Account Details';
-        case BackofficePage.billingEditAccount:
-          return 'Edit Billing Account';
-        case BackofficePage.billingStatusHistory:
-          return 'Status History';
-        case BackofficePage.billingSchedule:
-          return 'Schedule Payment Date';
-      }
-    }
+    String getPageTitle(BackofficePage page) => switch (page) {
+        BackofficePage.dashboard => 'Overview',
+        BackofficePage.dataManagement => 'Import Data',
+        BackofficePage.investigatorAssignments => 'Investigators',
+        BackofficePage.fieldReports => 'Reports',
+        BackofficePage.notificationsChat => 'Chats',
+        BackofficePage.mapView => 'Map View',
+        BackofficePage.settings => 'Settings',
+        BackofficePage.billingDashboard => 'Billing Intelligence',
+        BackofficePage.meterDetails => 'Investigation Summary',
+        BackofficePage.editInvestigation => 'Edit Investigation',
+        BackofficePage.billingAccountDetails => 'Account Details',
+        BackofficePage.billingEditAccount => 'Edit Billing Account',
+        BackofficePage.billingStatusHistory => 'Status History',
+        BackofficePage.billingSchedule => 'Schedule Payment Date',
+        BackofficePage.analyticalReports => 'Analytical Reports',
+        BackofficePage.revenueAnalysisReport => 'Revenue Analysis Report',
+      };
 
     return Container(
       height: 80,

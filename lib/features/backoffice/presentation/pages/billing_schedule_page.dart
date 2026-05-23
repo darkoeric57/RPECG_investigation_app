@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/backoffice_providers.dart';
+import '../../domain/billing_account.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class BillingSchedulePage extends ConsumerStatefulWidget {
@@ -27,7 +28,7 @@ class _BillingSchedulePageState extends ConsumerState<BillingSchedulePage> {
       final account = ref.read(selectedBillingAccountProvider);
       if (account != null) {
         // Remove 'GHS ' prefix if present for the controller
-        final bal = account['balance']?.replaceAll('GHS ', '').replaceAll(',', '') ?? '0.00';
+        final bal = account.balance.replaceAll('GHS ', '').replaceAll(',', '');
         _balanceController.text = bal;
       }
     });
@@ -169,7 +170,7 @@ class _BillingSchedulePageState extends ConsumerState<BillingSchedulePage> {
     );
   }
 
-  Widget _buildFormSection(Map<String, String> account) {
+  Widget _buildFormSection(BillingAccount account) {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
@@ -192,7 +193,7 @@ class _BillingSchedulePageState extends ConsumerState<BillingSchedulePage> {
               Expanded(
                 child: _buildInfoDisplay(
                   'Customer Name',
-                  account['name'] ?? 'N/A',
+                  account.name,
                   Icons.person_rounded,
                 ),
               ),
@@ -376,7 +377,7 @@ class _BillingSchedulePageState extends ConsumerState<BillingSchedulePage> {
     );
   }
 
-  Widget _buildContextSidebar(Map<String, String> account) {
+  Widget _buildContextSidebar(BillingAccount account) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -454,7 +455,7 @@ class _BillingSchedulePageState extends ConsumerState<BillingSchedulePage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(account['address'] ?? 'Osu Industrial Area', style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark, fontSize: 16)),
+                      Text(account.address, style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.textDark, fontSize: 16)),
                       const Text('Zone 4 - Utility Corridor A', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
                     ],
                   ),

@@ -21,7 +21,6 @@ class _AddInfrastructureDialogState extends ConsumerState<AddInfrastructureDialo
   final _idController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _brandController = TextEditingController();
   final _findingsController = TextEditingController();
   final _spnController = TextEditingController();
   final _gpsController = TextEditingController();
@@ -38,7 +37,6 @@ class _AddInfrastructureDialogState extends ConsumerState<AddInfrastructureDialo
     _idController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
-    _brandController.dispose();
     _findingsController.dispose();
     _spnController.dispose();
     _gpsController.dispose();
@@ -75,7 +73,6 @@ class _AddInfrastructureDialogState extends ConsumerState<AddInfrastructureDialo
         customerName: _nameController.text.trim(),
         address: _addressController.text.trim(),
         telephone: _phoneController.text.trim(),
-        brand: _brandController.text.trim(),
         findings: combinedFindings,
         status: _selectedStatus,
         installationDate: DateTime.now(),
@@ -171,9 +168,8 @@ class _AddInfrastructureDialogState extends ConsumerState<AddInfrastructureDialo
 
                         Row(
                           children: [
-                            Expanded(child: _buildTextField('METER BRAND', _brandController, Icons.factory_outlined)),
-                            const SizedBox(width: 24),
                             Expanded(child: _buildTextField('GPS COORDINATES', _gpsController, Icons.gps_fixed_rounded, isReadOnly: false)),
+                            const Spacer(),
                           ],
                         ),
                         const SizedBox(height: 32),

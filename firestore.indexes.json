@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "BillingAccounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "account",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "imported_at",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

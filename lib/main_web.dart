@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:backendless_sdk/backendless_sdk.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:google_sign_in/google_sign_in.dart' as gsi;
 
 import 'features/backoffice/core/backoffice_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers.dart';
 import 'core/config/app_config.dart';
-import 'core/services/backendless_auth_service.dart';
+import 'core/services/firebase_auth_service.dart';
 import 'core/utils/web_utils.dart';
 
 import 'features/meters/domain/meter.dart';
@@ -20,6 +21,16 @@ final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  debugPrint('FIREBASE_INIT: Initializing Firebase...');
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('FIREBASE_INIT: Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('FIREBASE_INIT: Firebase init failed: $e');
+  }
 
   debugPrint('BACKENDLESS_AUTH_DEBUG: main_web() started');
 
@@ -39,39 +50,38 @@ void main() async {
 
   // Open Boxes with aggressive Panic Clear & Timeout fallback
   try {
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Opening Hive boxes...');
     await Future.wait([
       Hive.openBox('settings'),
       Hive.openBox<Meter>('meters_box'),
       Hive.openBox<Investigator>('investigators_box'),
-    ]).timeout(const Duration(seconds: 4));
+    ]).timeout(const Duration(seconds: 15));
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Hive boxes opened successfully');
   } catch (e) {
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Hive init hung or failed. Forced clearing: $e');
+    debugPrint('BACKENDLESS_AUTH_DEBUG: Hive init failed or timed out. Attempting recovery: $e');
     try {
+      await Hive.close(); // Try to close everything first
       await Hive.deleteBoxFromDisk('settings');
       await Hive.deleteBoxFromDisk('meters_box');
       await Hive.deleteBoxFromDisk('investigators_box');
-    } catch (_) {}
+      debugPrint('BACKENDLESS_AUTH_DEBUG: Corrupted boxes cleared from disk');
+    } catch (clearError) {
+      debugPrint('BACKENDLESS_AUTH_DEBUG: Critical failure during box clearing: $clearError');
+    }
     
-    // Retry once with clean state
-    await Hive.openBox('settings');
-    await Hive.openBox<Meter>('meters_box');
-    await Hive.openBox<Investigator>('investigators_box');
+    // Final retry with clean state
+    try {
+      await Hive.openBox('settings');
+      await Hive.openBox<Meter>('meters_box');
+      await Hive.openBox<Investigator>('investigators_box');
+      debugPrint('BACKENDLESS_AUTH_DEBUG: Hive boxes re-opened after recovery');
+    } catch (retryError) {
+      debugPrint('BACKENDLESS_AUTH_DEBUG: UNRECOVERABLE HIVE ERROR: $retryError');
+      // If we still can't open Hive, we continue but the app will likely be in an unstable state
+    }
   }
-  debugPrint('BACKENDLESS_AUTH_DEBUG: Hive boxes opened');
 
-  // Initialize Backendless
-  try {
-    await Backendless.initApp(
-      applicationId: AppConfig.backendlessApplicationId,
-      iosApiKey: AppConfig.backendlessIosApiKey,
-      androidApiKey: AppConfig.backendlessAndroidApiKey,
-      jsApiKey: AppConfig.backendlessJsApiKey,
-    );
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Backendless initialized successfully');
-  } catch (e) {
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Backendless init failed, switching to MOCK AUTH MODE: $e');
-    BackendlessAuthService.useMock = true;
-  }
+
 
   final container = ProviderContainer();
 
@@ -97,7 +107,7 @@ void main() async {
     return null;
   });
 
-  final authService = BackendlessAuthService();
+  final authService = FirebaseAuthService();
   authService.isValidLogin().then((valid) async {
     if (valid) {
       final user = await authService.getCurrentUser();

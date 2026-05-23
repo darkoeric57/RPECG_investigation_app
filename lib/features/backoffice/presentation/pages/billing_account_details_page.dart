@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import 'package:files/features/backoffice/presentation/providers/backoffice_providers.dart';
 import 'package:files/core/theme/app_theme.dart';
+import '../../domain/billing_account.dart';
 
 class BillingAccountDetailsPage extends ConsumerWidget {
   const BillingAccountDetailsPage({super.key});
@@ -9,6 +12,9 @@ class BillingAccountDetailsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(selectedBillingAccountProvider);
+    final historyAsync = account != null 
+        ? ref.watch(billingAccountHistoryProvider(account.account))
+        : const AsyncValue<List<BillingAccount>>.data([]);
 
     if (account == null) {
       return Center(
@@ -28,7 +34,7 @@ class BillingAccountDetailsPage extends ConsumerWidget {
       );
     }
 
-    final status = account['status'] ?? '';
+    final status = account.status;
     final isOverdue = status == 'Overdue';
     final isPaid = status == 'Paid';
     final isScheduled = status == 'Scheduled';
@@ -74,13 +80,13 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    account['initials'] ?? '??',
+                    account.initials,
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.primary),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  account['name'] ?? 'Unknown',
+                  account.name,
                   style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: -1),
                 ),
                 const SizedBox(height: 12),
@@ -107,7 +113,7 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
-                      child: Text(account['tariff'] ?? '', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF475569), letterSpacing: 0.5)),
+                      child: Text(account.tariff, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF475569), letterSpacing: 0.5)),
                     ),
                   ],
                 ),
@@ -136,19 +142,21 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                       const Text('OUTSTANDING BALANCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 2)),
                       const SizedBox(height: 20),
                       Text(
-                        account['balance'] ?? 'GHS 0.00',
+                        'GHS ${account.balance}',
                         style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: isOverdue ? const Color(0xFFEF4444) : AppTheme.primary, letterSpacing: -1),
                       ),
                       const SizedBox(height: 16),
                       const Divider(color: Color(0xFFF1F5F9)),
                       const SizedBox(height: 16),
-                      _detailRow('Total Amount', account['total_amount'] ?? '0'),
+                      _detailRow('Total Amount', 'GHS ${account.totalAmount}'),
                       const SizedBox(height: 10),
-                      _detailRow('Amount Paid', account['amount_paid'] ?? '0'),
+                      _detailRow('Amount Paid', 'GHS ${account.amountPaid}'),
                       const SizedBox(height: 10),
-                      _detailRow('Created At', account['created_at'] ?? '—'),
+                      _detailRow('Created At', account.createdAt),
                       const SizedBox(height: 10),
-                      _detailRow('Date Scheduled', account['scheduled'] ?? '—'),
+                      _detailRow('Date Scheduled', account.scheduled),
+                      const SizedBox(height: 10),
+                      _detailRow('File import Date', account.importedAt != null ? '${account.importedAt!.day}/${account.importedAt!.month}/${account.importedAt!.year}' : '—'),
                     ],
                   ),
                 ),
@@ -172,16 +180,16 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
-                        child: Text(account['meter'] ?? '—', style: const TextStyle(fontFamily: 'monospace', fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                        child: Text(account.meter, style: const TextStyle(fontFamily: 'monospace', fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.primary)),
                       ),
                       const SizedBox(height: 24),
-                      _detailRow('Account No.', account['account'] ?? '—'),
+                      _detailRow('Account No.', account.account),
                       const SizedBox(height: 10),
-                      _detailRow('Consumption (kWh)', account['consumption'] ?? '—'),
+                      _detailRow('Consumption (kWh)', account.consumption),
                       const SizedBox(height: 10),
-                      _detailRow('Fraud Type', account['fraud_status'] ?? '—'),
+                      _detailRow('Fraud Type', account.fraudStatus),
                       const SizedBox(height: 10),
-                      _detailRow('Fraud Bill Status', account['fraud_bill_status'] ?? '—'),
+                      _detailRow('Fraud Bill Status', account.fraudBillStatus),
                     ],
                   ),
                 ),
@@ -258,7 +266,7 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                         children: [
                           Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF726200), shape: BoxShape.circle)),
                           const SizedBox(width: 8),
-                          Text('STATUS: ${(account['fraud_bill_status'] ?? 'UNKNOWN').toUpperCase()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF726200))),
+                          Text('STATUS: ${account.fraudBillStatus.toUpperCase()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF726200))),
                         ],
                       ),
                     ),
@@ -268,7 +276,7 @@ class BillingAccountDetailsPage extends ConsumerWidget {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     const steps = ['Billed', 'Pending', 'Scheduled', 'Paid'];
-                    final fbs = (account['fraud_bill_status'] ?? '').toString().toLowerCase();
+                    final fbs = account.fraudBillStatus.toLowerCase();
                     final activeIndex = fbs.contains('paid') ? 3 : fbs.contains('sched') ? 2 : fbs.contains('pend') ? 1 : 0;
                     return Stack(
                       children: [
@@ -304,7 +312,16 @@ class BillingAccountDetailsPage extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 64),
+          const SizedBox(height: 32),
+          
+          // Trend Chart
+          historyAsync.when(
+            data: (history) => _RevenueTrendCard(history: history),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error loading trends: $e'),
+          ),
+          
+          const SizedBox(height: 48),
 
           // Action buttons
           Row(
@@ -398,6 +415,93 @@ class _ActionBtnState extends State<_ActionBtn> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RevenueTrendCard extends StatelessWidget {
+  final List<BillingAccount> history;
+  const _RevenueTrendCard({required this.history});
+
+  @override
+  Widget build(BuildContext context) {
+    if (history.length < 2) return const SizedBox.shrink();
+
+    // Sort history by date (oldest first for chart)
+    final sortedHistory = List<BillingAccount>.from(history)
+      ..sort((a, b) => (a.importedAt ?? DateTime.now()).compareTo(b.importedAt ?? DateTime.now()));
+
+    final spots = sortedHistory.asMap().entries.map((e) {
+      final balance = double.tryParse(e.value.balance.replaceAll(',', '')) ?? 0.0;
+      return FlSpot(e.key.toDouble(), balance);
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('REVENUE RECOVERY TREND', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1)),
+          const SizedBox(height: 4),
+          const Text('Historical balance tracking across billing cycles', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 48),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= sortedHistory.length) return const SizedBox.shrink();
+                        final date = sortedHistory[idx].importedAt;
+                        if (date == null) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(DateFormat('MMM dd').format(date), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: AppTheme.primary,
+                    barWidth: 4,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(
+                      show: true,
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primary.withValues(alpha: 0.1), AppTheme.primary.withValues(alpha: 0.0)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

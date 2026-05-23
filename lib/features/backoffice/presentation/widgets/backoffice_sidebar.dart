@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/backoffice_providers.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/backendless_auth_service.dart';
+import '../../../../core/services/firebase_auth_service.dart';
 import '../../../../core/providers.dart';
 
 class BackofficeSidebar extends ConsumerWidget {
@@ -179,7 +179,7 @@ class BackofficeSidebar extends ConsumerWidget {
             'Sign Out', 
             isCollapsed,
             onTap: () async {
-              final authService = BackendlessAuthService();
+              final authService = FirebaseAuthService();
               await authService.logout();
               ref.read(userProvider.notifier).state = null;
               if (context.mounted) {

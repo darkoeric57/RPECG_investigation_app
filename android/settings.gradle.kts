@@ -25,3 +25,5 @@ plugins {
 }
 
 include(":app")
+
+rootProject.name = "rpecg_investigation_app"

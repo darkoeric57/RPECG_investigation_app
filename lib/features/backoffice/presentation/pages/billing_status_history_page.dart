@@ -2,17 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:files/features/backoffice/presentation/providers/backoffice_providers.dart';
 import 'package:files/core/theme/app_theme.dart';
+import '../../domain/billing_account.dart';
 
 class BillingStatusHistoryPage extends ConsumerWidget {
   const BillingStatusHistoryPage({super.key});
-
-  static final _history = [
-    {'date': '01 Oct 2026', 'status': 'Billed', 'amount': 'GHS 3,890.15', 'note': 'Invoice generated for Q3 billing cycle.', 'icon': 'receipt'},
-    {'date': '05 Oct 2026', 'status': 'Pending', 'amount': 'GHS 3,890.15', 'note': 'Payment reminder sent to account holder.', 'icon': 'pending'},
-    {'date': '12 Oct 2026', 'status': 'Scheduled', 'amount': 'GHS 1,500.00', 'note': 'Instalment plan agreed. First payment scheduled.', 'icon': 'calendar'},
-    {'date': '18 Oct 2026', 'status': 'Overdue', 'amount': 'GHS 2,390.15', 'note': 'First instalment missed. Account flagged overdue.', 'icon': 'warning'},
-    {'date': '22 Oct 2026', 'status': 'Scheduled', 'amount': 'GHS 2,390.15', 'note': 'Revised payment arrangement agreed with customer.', 'icon': 'calendar'},
-  ];
 
   Color _statusColor(String s) {
     switch (s) {
@@ -24,20 +17,28 @@ class BillingStatusHistoryPage extends ConsumerWidget {
     }
   }
 
-  IconData _statusIcon(String icon) {
-    switch (icon) {
-      case 'receipt': return Icons.receipt_long_rounded;
-      case 'pending': return Icons.hourglass_top_rounded;
-      case 'calendar': return Icons.calendar_today_rounded;
-      case 'warning': return Icons.warning_amber_rounded;
-      default: return Icons.circle_outlined;
+  String _getMonth(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
+  }
+
+  IconData _getIconForStatus(String status) {
+    switch (status) {
+      case 'Paid': return Icons.verified_rounded;
+      case 'Overdue': return Icons.warning_amber_rounded;
+      case 'Scheduled': return Icons.calendar_today_rounded;
+      case 'Pending': return Icons.hourglass_top_rounded;
+      default: return Icons.receipt_long_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(selectedBillingAccountProvider);
-    final name = account?['name'] ?? 'Unknown Account';
+    final name = account?.name ?? 'Unknown Account';
+    final historyAsync = account != null 
+        ? ref.watch(billingAccountHistoryProvider(account.account))
+        : const AsyncValue<List<BillingAccount>>.data([]);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(48),
@@ -107,139 +108,163 @@ class BillingStatusHistoryPage extends ConsumerWidget {
           const SizedBox(height: 48),
 
           // Summary stats
-          Row(
-            children: [
-              _StatCard(label: 'TOTAL EVENTS', value: '${_history.length}', icon: Icons.timeline_rounded, color: AppTheme.primary),
-              const SizedBox(width: 20),
-              _StatCard(label: 'OVERDUE FLAGS', value: '${_history.where((h) => h['status'] == 'Overdue').length}', icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444)),
-              const SizedBox(width: 20),
-              _StatCard(label: 'SCHEDULED EVENTS', value: '${_history.where((h) => h['status'] == 'Scheduled').length}', icon: Icons.calendar_today_rounded, color: const Color(0xFF2563EB)),
-              const SizedBox(width: 20),
-              _StatCard(label: 'DAYS TRACKED', value: '21', icon: Icons.date_range_rounded, color: const Color(0xFF7C3AED)),
-            ],
-          ),
-          const SizedBox(height: 40),
+          historyAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (historyList) {
+              final history = historyList.isNotEmpty ? historyList : []; // Can fallback to _history if empty for demo
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      _StatCard(label: 'TOTAL EVENTS', value: '${history.length}', icon: Icons.timeline_rounded, color: AppTheme.primary),
+                      const SizedBox(width: 20),
+                      _StatCard(label: 'OVERDUE FLAGS', value: '${history.where((h) => h.status == 'Overdue').length}', icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444)),
+                      const SizedBox(width: 20),
+                      _StatCard(label: 'SCHEDULED EVENTS', value: '${history.where((h) => h.status == 'Scheduled').length}', icon: Icons.calendar_today_rounded, color: const Color(0xFF2563EB)),
+                      const SizedBox(width: 20),
+                      _StatCard(label: 'DAYS TRACKED', value: history.isEmpty ? '0' : '21', icon: Icons.date_range_rounded, color: const Color(0xFF7C3AED)),
+                    ],
+                  ),
+                  const SizedBox(height: 40),
 
-          // Timeline
-          Container(
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.04), blurRadius: 40, offset: const Offset(0, 10))],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.timeline_rounded, color: AppTheme.primary, size: 20),
+                  // Timeline
+                  Container(
+                    padding: const EdgeInsets.all(40),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFF1F5F9)),
+                      boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.04), blurRadius: 40, offset: const Offset(0, 10))],
                     ),
-                    const SizedBox(width: 16),
-                    const Text('BILLING STATUS TIMELINE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: -0.5)),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                ..._history.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final item = entry.value;
-                  final isLast = i == _history.length - 1;
-                  final color = _statusColor(item['status']!);
-                  return IntrinsicHeight(
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Timeline spine
-                        SizedBox(
-                          width: 48,
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 44, height: 44,
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
-                                ),
-                                child: Icon(_statusIcon(item['icon']!), color: color, size: 20),
-                              ),
-                              if (!isLast)
-                                Expanded(
-                                  child: Container(
-                                    width: 2,
-                                    margin: const EdgeInsets.symmetric(vertical: 4),
-                                    color: const Color(0xFFF1F5F9),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                              child: const Icon(Icons.timeline_rounded, color: AppTheme.primary, size: 20),
+                            ),
+                            const SizedBox(width: 16),
+                            const Text('BILLING STATUS TIMELINE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: -0.5)),
+                          ],
                         ),
-                        const SizedBox(width: 20),
-                        // Content
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(bottom: isLast ? 0 : 32),
-                            child: Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFEEEEF0)),
-                              ),
+                        const SizedBox(height: 40),
+                        if (history.isEmpty)
+                          const Center(child: Padding(
+                            padding: EdgeInsets.all(40.0),
+                            child: Text('No historical records found for this account.'),
+                          ))
+                        else
+                          ...history.asMap().entries.map((entry) {
+                            final i = entry.key;
+                            final item = entry.value;
+                            final isLast = i == history.length - 1;
+                            final color = _statusColor(item.status);
+                            final dateStr = item.importedAt != null 
+                                ? '${item.importedAt!.day} ${_getMonth(item.importedAt!.month)} ${item.importedAt!.year}'
+                                : item.createdAt;
+
+                            return IntrinsicHeight(
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
+                                  // Timeline spine
+                                  SizedBox(
+                                    width: 48,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: color.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(20),
-                                                border: Border.all(color: color.withValues(alpha: 0.3)),
-                                              ),
-                                              child: Text(item['status']!.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 1)),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Text(item['date']!, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-                                          ],
+                                        Container(
+                                          width: 44, height: 44,
+                                          decoration: BoxDecoration(
+                                            color: color.withValues(alpha: 0.1),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
+                                          ),
+                                          child: Icon(_getIconForStatus(item.status), color: color, size: 20),
                                         ),
-                                        const SizedBox(height: 12),
-                                        Text(item['note']!, style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w500, height: 1.5)),
+                                        if (!isLast)
+                                          Expanded(
+                                            child: Container(
+                                              width: 2,
+                                              margin: const EdgeInsets.symmetric(vertical: 4),
+                                              color: const Color(0xFFF1F5F9),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 20),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      const Text('AMOUNT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item['amount']!,
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: item['status'] == 'Overdue' ? const Color(0xFFEF4444) : AppTheme.primary),
+                                  // Content
+                                  Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(bottom: isLast ? 0 : 32),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(24),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: const Color(0xFFEEEEF0)),
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: color.withValues(alpha: 0.1),
+                                                          borderRadius: BorderRadius.circular(20),
+                                                          border: Border.all(color: color.withValues(alpha: 0.3)),
+                                                        ),
+                                                        child: Text(item.status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 1)),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  Text(
+                                                    'Snapshot from billing cycle. Fraud Status: ${item.fraudStatus}. Tariff: ${item.tariff}.', 
+                                                    style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w500, height: 1.5)
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 20),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              children: [
+                                                const Text('OUTSTANDING', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'GHS ${item.balance}',
+                                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: item.status == 'Overdue' ? const Color(0xFFEF4444) : AppTheme.primary),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                        ),
+                            );
+                          }),
                       ],
                     ),
-                  );
-                }),
-              ],
-            ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 40),
 

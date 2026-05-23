@@ -4,15 +4,20 @@ import '../features/dashboard/data/investigator_repository.dart';
 import '../features/meters/domain/meter.dart';
 import '../features/dashboard/domain/investigator.dart';
 import 'services/google_drive_service.dart';
+import '../features/backoffice/services/report_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart' as auth;
-import 'package:backendless_sdk/backendless_sdk.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/firebase_auth_service.dart';
+import 'services/firebase_data_service.dart';
 
 // Theme Logic
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 // Auth State
-final userProvider = StateProvider<BackendlessUser?>((ref) => null);
+final userProvider = StateProvider<User?>((ref) => null);
+final firebaseAuthProvider = Provider<FirebaseAuthService>((ref) => FirebaseAuthService());
+final firestoreDataProvider = Provider<FirestoreDataService>((ref) => FirestoreDataService());
 
 // Repositories
 final meterRepositoryProvider = Provider<MeterRepository>((ref) => HiveMeterRepository());
@@ -22,6 +27,11 @@ final googleSignInAccountProvider = StreamProvider<auth.GoogleSignInAccount?>((r
   return service.onCurrentUserChanged;
 });
 final investigatorRepositoryProvider = Provider<InvestigatorRepository>((ref) => HiveInvestigatorRepository());
+final reportServiceProvider = Provider<ReportService>((ref) {
+  final repo = ref.watch(meterRepositoryProvider);
+  final firestore = ref.watch(firestoreDataProvider);
+  return ReportService(repo, firestore);
+});
 
 // Data Streams / Futures
 final investigatorsProvider = FutureProvider<List<Investigator>>((ref) async {

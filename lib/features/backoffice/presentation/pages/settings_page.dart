@@ -15,7 +15,7 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
-    final name = (user?.getProperty('name') as String?) ?? 'Admin User';
+    final name = user?.displayName ?? 'Admin User';
     final email = user?.email ?? 'admin@fieldops.com';
     final initials = name
         .split(' ')
@@ -403,7 +403,7 @@ class SettingsPage extends ConsumerWidget {
         const SizedBox(height: 12),
         _buildAboutRow('Platform', 'Flutter Web'),
         const SizedBox(height: 12),
-        _buildAboutRow('Data Provider', 'Backendless Platform'),
+        _buildAboutRow('Data Provider', 'Firebase Platform'),
         const SizedBox(height: 20),
         const Divider(color: Color(0xFFF1F5F9)),
         const SizedBox(height: 16),

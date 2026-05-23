@@ -146,12 +146,12 @@ class DataManagementPage extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No data to export.')));
               return;
             }
-            final csv = StringBuffer('Customer,Meter ID,Phone Number,Meter Brand,Findings,Bill Amount,Paid Amount\n');
+            final csv = StringBuffer('Customer,Meter ID,Phone Number,Findings,Bill Amount,Paid Amount\n');
             for (final m in meters) {
               final findings = m.findings ?? 'None';
               final debt = m.debtAmount ?? 0.0;
               final paid = m.paidAmount ?? 0.0;
-              csv.writeln('"${m.customerName}","${m.id}","${m.telephone}","${m.brand}","$findings","GHS ${debt.toStringAsFixed(2)}","GHS ${paid.toStringAsFixed(2)}"');
+              csv.writeln('"${m.customerName}","${m.id}","${m.telephone}","$findings","GHS ${debt.toStringAsFixed(2)}","GHS ${paid.toStringAsFixed(2)}"');
             }
             WebUtils.downloadFile('infrastructure_report.csv', csv.toString());
             ScaffoldMessenger.of(context).showSnackBar(
@@ -229,10 +229,9 @@ class DataManagementPage extends ConsumerWidget {
 
   Widget _buildPremiumFilterButton(BuildContext context, WidgetRef ref) {
     final statusFilters = ref.watch(meterStatusFilterSetProvider);
-    final brandFilters = ref.watch(meterBrandFilterSetProvider);
     final findingsFilters = ref.watch(meterFindingsFilterSetProvider);
 
-    int activeCount = statusFilters.length + brandFilters.length + findingsFilters.length;
+    int activeCount = statusFilters.length + findingsFilters.length;
 
     return GestureDetector(
       onTap: () => Scaffold.of(context).openEndDrawer(),
@@ -393,8 +392,6 @@ class DataManagementPage extends ConsumerWidget {
           const SizedBox(width: 32),
           _buildHeadCell('PHONE NUMBER', 1.0),
           const SizedBox(width: 32),
-          _buildHeadCell('METER BRAND', 0.9),
-          const SizedBox(width: 32),
           _buildHeadCell('FINDINGS', 1.1),
           const SizedBox(width: 32),
           _buildHeadCell('BILL AMOUNT', 0.9),
@@ -485,17 +482,7 @@ class DataManagementPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 32),
-          // 4. BRAND - Flex 0.9
-          Expanded(
-            flex: 9,
-            child: Text(
-              meter.brand.toUpperCase(),
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF94A3B8), letterSpacing: 0.5),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 32),
-          // 5. FINDINGS - Flex 1.1
+          // 4. FINDINGS - Flex 1.1
           Expanded(
             flex: 11,
             child: Container(

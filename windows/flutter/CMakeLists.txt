@@ -14,6 +14,7 @@ set(WRAPPER_ROOT "${EPHEMERAL_DIR}/cpp_client_wrapper")
 if (NOT DEFINED FLUTTER_TARGET_PLATFORM)
   set(FLUTTER_TARGET_PLATFORM "windows-x64")
 endif()
+set(FLUTTER_TARGET_PLATFORM "${FLUTTER_TARGET_PLATFORM}" PARENT_SCOPE)
 
 # === Flutter Library ===
 set(FLUTTER_LIBRARY "${EPHEMERAL_DIR}/flutter_windows.dll")

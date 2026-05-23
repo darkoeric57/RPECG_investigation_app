@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/backendless_data_service.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/legacy/backendless_data_service.dart';
+import '../../../../core/services/firebase_data_service.dart';
 import '../../../../features/meters/domain/meter.dart';
 import '../../../../features/dashboard/domain/investigator.dart';
-
+import '../../domain/billing_account.dart';
 // ─── Pages ───────────────────────────────────────────────────────────────────
 
 enum BackofficePage {
@@ -20,6 +22,8 @@ enum BackofficePage {
   billingEditAccount,
   billingStatusHistory,
   billingSchedule,
+  analyticalReports,
+  revenueAnalysisReport,
 }
 
 final backofficePageProvider =
@@ -29,8 +33,8 @@ final isSidebarCollapsedProvider = StateProvider<bool>((ref) => false);
 
 final selectedMeterProvider = StateProvider<Meter?>((ref) => null);
 
-/// Holds the currently selected billing account map for action pages
-final selectedBillingAccountProvider = StateProvider<Map<String, String>?>((ref) => null);
+/// Holds the currently selected billing account for action pages
+final selectedBillingAccountProvider = StateProvider<BillingAccount?>((ref) => null);
 
 // ─── Meters ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +56,7 @@ final availableFilterValuesProvider = Provider<({Set<MeterStatus> statuses, Set<
   return metersAsync.maybeWhen(
     data: (meters) {
       final statuses = meters.map((m) => m.status).toSet();
-      final brands = meters.map((m) => m.brand).where((b) => b.isNotEmpty).toSet();
+      final brands = meters.map((m) => m.spnNumber).where((b) => b.isNotEmpty).toSet();
       
       final findingsKeywords = <String>{};
       for (final meter in meters) {
@@ -101,7 +105,7 @@ final filteredMetersProvider = Provider<List<Meter>>((ref) {
       
       // 3. Brand Intersection
       if (brandFilters.isNotEmpty) {
-        filtered = filtered.where((m) => brandFilters.contains(m.brand)).toList();
+        filtered = filtered.where((m) => brandFilters.contains(m.spnNumber)).toList();
       }
       
       // 4. Findings Intersection
@@ -298,30 +302,102 @@ final deleteMeterActionProvider = Provider((ref) {
   };
 });
 // ─── Billing Dashboard ────────────────────────────────────────────────────────
- 
-final billingAccountsProvider = StateProvider<List<Map<String, String>>>((ref) => [
-  {'initials': 'RJ', 'name': 'Robert Jenkins', 'meter': 'MTR-88291', 'account': 'ACC-00412', 'consumption': '99120-X', 'fraud_status': 'Tamper', 'total_amount': '12', 'balance': 'GHS 1,240.50', 'tariff': 'Residential', 'status': 'Overdue', 'scheduled': '10 Oct 2026', 'created_at': '01 Oct 2026'},
-  {'initials': 'AS', 'name': 'Alina Sterling', 'meter': 'MTR-90023', 'account': 'ACC-11892', 'consumption': '44120-P', 'fraud_status': '—', 'total_amount': '4', 'balance': 'GHS 0.00', 'tariff': 'Residential', 'status': 'Paid', 'scheduled': '—', 'created_at': '05 Oct 2026'},
-  {'initials': 'GC', 'name': 'Green City Logistics', 'meter': 'MTR-77121', 'account': 'ACC-88321', 'consumption': '22900-L', 'fraud_status': 'Faulty meter', 'total_amount': '24', 'balance': 'GHS 14,500.00', 'tariff': 'Non-Residential', 'status': 'Scheduled', 'scheduled': '20 Oct 2026', 'created_at': '10 Oct 2026'},
-  {'initials': 'MM', 'name': 'Marcus Miller', 'meter': 'MTR-12554', 'account': 'ACC-55231', 'consumption': '11204-K', 'fraud_status': 'Bypass', 'total_amount': '1', 'balance': 'GHS 245.20', 'tariff': 'Residential', 'status': 'Pending', 'scheduled': '22 Oct 2026', 'created_at': '12 Oct 2026'},
-  {'initials': 'SD', 'name': 'Sun Dry Cleaners', 'meter': 'MTR-44211', 'account': 'ACC-99011', 'consumption': '88412-Y', 'fraud_status': 'No network service connection', 'total_amount': '36', 'balance': 'GHS 3,890.15', 'tariff': 'Non-Residential', 'status': 'Overdue', 'scheduled': '05 Oct 2026', 'created_at': '25 Sep 2026'},
-]);
+
+/// Loads billing accounts from Firestore. Use [ref.invalidate] after
+/// importing to force a fresh fetch.
+final billingAccountsProvider = FutureProvider<List<BillingAccount>>((ref) async {
+  final dataService = FirestoreDataService();
+  return dataService.getBillingAccounts();
+});
 
 final billingSearchQueryProvider = StateProvider<String>((ref) => '');
 
-final filteredBillingAccountsProvider = Provider<List<Map<String, String>>>((ref) {
-  final accounts = ref.watch(billingAccountsProvider);
+/// Synchronous filtered list derived from the async billingAccountsProvider.
+/// Returns [] while loading or on error.
+final filteredBillingAccountsProvider = Provider<List<BillingAccount>>((ref) {
+  final accountsAsync = ref.watch(billingAccountsProvider);
   final query = ref.watch(billingSearchQueryProvider).toLowerCase().trim();
-  
+
+  final accounts = accountsAsync.valueOrNull ?? [];
   if (query.isEmpty) return accounts;
-  
+
   return accounts.where((account) {
-    final name = (account['name'] ?? '').toLowerCase();
-    final meter = (account['meter'] ?? '').toLowerCase();
-    final accountNumber = (account['account'] ?? '').toLowerCase();
-    
-    return name.contains(query) || 
-           meter.contains(query) || 
-           accountNumber.contains(query);
+    final name = account.name.toLowerCase();
+    final meter = account.meter.toLowerCase();
+    final accountNumber = account.account.toLowerCase();
+    return name.contains(query) ||
+        meter.contains(query) ||
+        accountNumber.contains(query);
   }).toList();
+});
+
+final billingAccountHistoryProvider =
+    FutureProvider.family<List<BillingAccount>, String>((ref, accountNumber) async {
+  final dataService = FirestoreDataService();
+  return dataService.getBillingHistory(accountNumber);
+});
+
+// --- Analytical Dashboard Providers ------------------------------------------
+
+/// Revenue summary: total billed, paid, outstanding, and collection rate.
+class _RevenueStats {
+  final double billed;
+  final double paid;
+  final double outstanding;
+  final double rate;
+  const _RevenueStats({required this.billed, required this.paid, required this.outstanding, required this.rate});
+}
+
+final billingRevenueStatsProvider = Provider<_RevenueStats>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  double totalBilled = 0;
+  double totalPaid = 0;
+  for (final a in accounts) {
+    final billed = double.tryParse(a.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+    final paid = double.tryParse(a.amountPaid.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+    totalBilled += billed;
+    totalPaid += paid;
+  }
+  final outstanding = totalBilled - totalPaid;
+  final rate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 0.0;
+  return _RevenueStats(billed: totalBilled, paid: totalPaid, outstanding: outstanding < 0 ? 0 : outstanding, rate: rate);
+});
+
+final fraudDistributionProvider = Provider<Map<String, int>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final counts = <String, int>{};
+  for (final a in accounts) {
+    final key = a.fraudBillStatus.isEmpty ? 'Unknown' : a.fraudBillStatus;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+});
+
+final billingStatusDistributionProvider = Provider<Map<String, int>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final counts = <String, int>{};
+  for (final a in accounts) {
+    final key = a.status.isEmpty ? 'Unknown' : a.status;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+});
+
+class _TariffPerf {
+  final double billed;
+  final double paid;
+  const _TariffPerf({required this.billed, required this.paid});
+}
+
+final tariffPerformanceProvider = Provider<Map<String, _TariffPerf>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final perf = <String, _TariffPerf>{};
+  for (final a in accounts) {
+    final tariff = a.tariff.isEmpty ? 'Unknown' : a.tariff;
+    final billed = double.tryParse(a.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+    final paid = double.tryParse(a.amountPaid.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+    final existing = perf[tariff] ?? const _TariffPerf(billed: 0, paid: 0);
+    perf[tariff] = _TariffPerf(billed: existing.billed + billed, paid: existing.paid + paid);
+  }
+  return perf;
 });

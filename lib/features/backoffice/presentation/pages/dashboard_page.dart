@@ -76,7 +76,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
             SizedBox(height: 4),
             Text(
-              'Real-time intelligence from Backendless',
+              'Real-time intelligence from Firebase',
               style: TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 14,

@@ -96,7 +96,6 @@ class MeterDetailsScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         _buildSection('Technical Specifications', [
           _buildInfoRow('Meter ID', meter.id),
-          _buildInfoRow('Brand', meter.brand),
           _buildInfoRow('Rating', meter.rating),
           _buildInfoRow('Phase', meter.phase.name.toUpperCase()),
           _buildInfoRow('Metering Type', meter.type.name.toUpperCase()),

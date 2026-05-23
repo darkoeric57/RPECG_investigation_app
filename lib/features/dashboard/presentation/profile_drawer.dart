@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_sign_in/google_sign_in.dart' as auth;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers.dart';
-import '../../../core/services/backendless_auth_service.dart';
+import '../../../core/services/firebase_auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../meters/presentation/add_meter_provider.dart';
 
 
@@ -32,7 +33,7 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
       setState(() => _isUploading = true);
 
       try {
-        final authService = BackendlessAuthService();
+        final authService = FirebaseAuthService();
         final updatedUser = await authService.updateProfilePicture(image.path);
         
         if (updatedUser != null && mounted) {
@@ -59,11 +60,11 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
     final user = ref.watch(userProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final name = user?.getProperty('name') as String? ?? '';
-    final staffId = user?.getProperty('staffId') as String? ?? '';
-    final region = user?.getProperty('region') as String? ?? '';
-    final groupNo = user?.getProperty('groupNo') as String? ?? '';
-    final profilePicUrl = user?.getProperty('user-pic') as String?;
+    final name = user?.displayName ?? '';
+    final staffId = ''; // Need to fetch from Firestore
+    final region = ''; // Need to fetch from Firestore
+    final groupNo = ''; // Need to fetch from Firestore
+    final profilePicUrl = user?.photoURL;
     final initials = name.isNotEmpty ? name.split(' ').map((e) => e[0]).take(2).join().toUpperCase() : '?';
 
     // Google Profile Info
@@ -470,7 +471,7 @@ class _ProfileDrawerState extends ConsumerState<ProfileDrawer> {
                 );
 
                 if (confirm == true) {
-                  final authService = BackendlessAuthService();
+                  final authService = FirebaseAuthService();
                   
                   // Perform logout first (sets sessionActive to false in file)
                   try {

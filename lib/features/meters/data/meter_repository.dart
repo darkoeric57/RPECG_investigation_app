@@ -1,6 +1,6 @@
 import 'package:hive/hive.dart';
 import '../domain/meter.dart';
-import '../../../core/services/backendless_data_service.dart';
+import '../../../core/services/firebase_data_service.dart';
 
 abstract class MeterRepository {
   Future<List<Meter>> getMeters();
@@ -31,7 +31,6 @@ class HiveMeterRepository implements MeterRepository {
       tariffActivity: TariffActivity.residential,
       geocode: 'GEO-001',
       spnNumber: 'SPN-77422910',
-      brand: 'EDMI',
       rating: '100A',
       phase: MeterPhase.single,
       type: MeteringType.prepaid,
@@ -52,7 +51,6 @@ class HiveMeterRepository implements MeterRepository {
       tariffActivity: TariffActivity.residential,
       geocode: 'GEO-002',
       spnNumber: 'SPN-991',
-      brand: 'EDMI',
       rating: '100A',
       phase: MeterPhase.single,
       type: MeteringType.prepaid,
@@ -70,7 +68,6 @@ class HiveMeterRepository implements MeterRepository {
       tariffActivity: TariffActivity.commercial,
       geocode: 'GEO-003',
       spnNumber: 'SPN-992',
-      brand: 'MOJEC',
       rating: '200A',
       phase: MeterPhase.three,
       type: MeteringType.postpaid,
@@ -105,7 +102,7 @@ class HiveMeterRepository implements MeterRepository {
   Future<void> syncMeters() async {
     final box = await _getBox();
     final unsynced = box.values.where((m) => !m.isSynced).toList();
-    final dataService = BackendlessDataService();
+    final dataService = FirestoreDataService();
 
     for (var meter in unsynced) {
       try {
@@ -122,7 +119,7 @@ class HiveMeterRepository implements MeterRepository {
   @override
   Future<void> pullMeters() async {
     final box = await _getBox();
-    final dataService = BackendlessDataService();
+    final dataService = FirestoreDataService();
     
     try {
       final remoteMeters = await dataService.getRemoteMeters();
@@ -146,10 +143,10 @@ class HiveMeterRepository implements MeterRepository {
     final buffer = StringBuffer();
     
     // Header
-    buffer.writeln('Meter ID,Customer Name,Address,Telephone,Tariff Class,GPS,Activity,Geocode,SPN,Brand,Rating,Phase,Type,Status,Date,Synced');
+    buffer.writeln('Meter ID,Customer Name,Address,Telephone,Tariff Class,GPS,Activity,Geocode,SPN,Rating,Phase,Type,Status,Date,Synced');
     
     for (var m in meters) {
-      buffer.writeln('${m.id},"${m.customerName}","${m.address}",${m.telephone},${m.tariffClass},${m.gpsCoordinates},${m.tariffActivity.name},${m.geocode},${m.spnNumber},${m.brand},${m.rating},${m.phase.name},${m.type.name},${m.status.name},${m.installationDate},${m.isSynced}');
+      buffer.writeln('${m.id},"${m.customerName}","${m.address}",${m.telephone},${m.tariffClass},${m.gpsCoordinates},${m.tariffActivity.name},${m.geocode},${m.spnNumber},${m.rating},${m.phase.name},${m.type.name},${m.status.name},${m.installationDate},${m.isSynced}');
     }
     
     return buffer.toString();

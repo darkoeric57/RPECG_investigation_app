@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:files/features/backoffice/presentation/providers/backoffice_providers.dart';
 import 'package:files/core/theme/app_theme.dart';
+import 'package:files/core/services/firebase_data_service.dart';
+import '../../domain/billing_account.dart';
 
 class BillingEditAccountPage extends ConsumerStatefulWidget {
   const BillingEditAccountPage({super.key});
@@ -21,6 +23,7 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
   late TextEditingController _createdDateCtrl;
   late TextEditingController _remarksCtrl;
   late TextEditingController _fraudStatusCtrl;
+  late TextEditingController _addressCtrl;
   String _selectedStatus = 'Pending';
   String _selectedTariff = 'Residential';
   bool _saving = false;
@@ -32,22 +35,23 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
   void initState() {
     super.initState();
     final account = ref.read(selectedBillingAccountProvider);
-    _nameCtrl = TextEditingController(text: account?['name'] ?? '');
-    _meterCtrl = TextEditingController(text: account?['meter'] ?? '');
-    _accountCtrl = TextEditingController(text: account?['account'] ?? '');
-    _consumptionCtrl = TextEditingController(text: account?['consumption'] ?? '');
+    _nameCtrl = TextEditingController(text: account?.name ?? '');
+    _meterCtrl = TextEditingController(text: account?.meter ?? '');
+    _accountCtrl = TextEditingController(text: account?.account ?? '');
+    _consumptionCtrl = TextEditingController(text: account?.consumption ?? '');
     
     // In Billing Dashboard, 'balance' usually contains the outstanding amount.
     // We'll treat it as 'paid' vs 'total' in the new module.
-    final currentBalance = account?['balance']?.replaceFirst('GHS ', '').replaceAll(',', '') ?? '0.00';
+    final currentBalance = account?.balance ?? '0.00';
     _balanceCtrl = TextEditingController(text: currentBalance);
-    _totalAmountCtrl = TextEditingController(text: account?['total_amount'] ?? '0');
-    _scheduledDateCtrl = TextEditingController(text: account?['scheduled'] ?? '');
-    _createdDateCtrl = TextEditingController(text: account?['created_at'] ?? '');
-    _fraudStatusCtrl = TextEditingController(text: account?['fraud_status'] ?? 'Normal');
+    _totalAmountCtrl = TextEditingController(text: account?.totalAmount ?? '0');
+    _scheduledDateCtrl = TextEditingController(text: account?.scheduled ?? '');
+    _createdDateCtrl = TextEditingController(text: account?.createdAt ?? '');
+    _fraudStatusCtrl = TextEditingController(text: account?.fraudStatus ?? 'Normal');
+    _addressCtrl = TextEditingController(text: account?.address ?? '—');
     _remarksCtrl = TextEditingController(text: 'Customer reports inconsistencies in recent billing cycle. Verification required.');
-    _selectedStatus = account?['status'] ?? 'Pending';
-    _selectedTariff = account?['tariff'] ?? 'Residential';
+    _selectedStatus = account?.status ?? 'Pending';
+    _selectedTariff = account?.tariff ?? 'Residential';
 
     // Add listeners for real-time recalculation
     _totalAmountCtrl.addListener(() => setState(() {}));
@@ -60,6 +64,7 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
     _consumptionCtrl.dispose(); _balanceCtrl.dispose(); _totalAmountCtrl.dispose();
     _scheduledDateCtrl.dispose(); _createdDateCtrl.dispose();
     _fraudStatusCtrl.dispose();
+    _addressCtrl.dispose();
     _remarksCtrl.dispose();
     super.dispose();
   }
@@ -88,6 +93,8 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
                   child: Column(
                     children: [
                       _buildIdentityCard(account),
+                      const SizedBox(height: 32),
+                      _buildContactModule(),
                       const SizedBox(height: 32),
                       _buildStatusSelector(),
                     ],
@@ -153,7 +160,7 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
     );
   }
 
-  Widget _buildHeader(BuildContext context, Map<String, String> account) {
+  Widget _buildHeader(BuildContext context, BillingAccount account) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -172,7 +179,7 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
             ),
             const SizedBox(height: 16),
             Text(
-              'Edit Account: ${account['name']}',
+              'Edit Account: ${account.name}',
               style: const TextStyle(
                 fontSize: 44,
                 fontWeight: FontWeight.w900,
@@ -198,13 +205,44 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
               onTap: () async {
                 if (_saving) return;
                 setState(() => _saving = true);
-                await Future.delayed(const Duration(milliseconds: 1500));
-                if (mounted) {
-                  setState(() => _saving = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Account changes synchronized successfully'), backgroundColor: AppTheme.primary),
+                
+                try {
+                  final updatedAccount = account.copyWith(
+                    name: _nameCtrl.text,
+                    meter: _meterCtrl.text,
+                    account: _accountCtrl.text,
+                    consumption: _consumptionCtrl.text,
+                    balance: _balanceCtrl.text,
+                    totalAmount: _totalAmountCtrl.text,
+                    scheduled: _scheduledDateCtrl.text,
+                    createdAt: _createdDateCtrl.text,
+                    fraudStatus: _fraudStatusCtrl.text,
+                    status: _selectedStatus,
+                    tariff: _selectedTariff,
+                    address: _addressCtrl.text,
                   );
-                  ref.read(backofficePageProvider.notifier).state = BackofficePage.billingDashboard;
+
+                  final dataService = FirestoreDataService();
+                  await dataService.updateBillingAccount(updatedAccount);
+                  
+                  ref.invalidate(billingAccountsProvider);
+                  // Update the selected account so the details page is fresh too
+                  ref.read(selectedBillingAccountProvider.notifier).state = updatedAccount;
+                  
+                  if (mounted) {
+                    setState(() => _saving = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Account changes synchronized successfully'), backgroundColor: AppTheme.primary),
+                    );
+                    ref.read(backofficePageProvider.notifier).state = BackofficePage.billingDashboard;
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    setState(() => _saving = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to save changes: $e'), backgroundColor: Colors.red),
+                    );
+                  }
                 }
               },
             ),
@@ -251,8 +289,8 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
     );
   }
 
-  Widget _buildIdentityCard(Map<String, String> account) {
-    final initials = account['name']!.split(' ').map((e) => e[0]).take(2).join().toUpperCase();
+  Widget _buildIdentityCard(BillingAccount account) {
+    final initials = account.initials;
 
     return Container(
       padding: const EdgeInsets.all(32),
@@ -289,7 +327,7 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  account['name']!,
+                  account.name,
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textDark),
                 ),
                 const SizedBox(height: 4),
@@ -297,18 +335,50 @@ class _BillingEditAccountPageState extends ConsumerState<BillingEditAccountPage>
                   children: [
                     const Icon(Icons.verified_rounded, color: AppTheme.primary, size: 16),
                     const SizedBox(width: 6),
-                    Text(account['tariff'] ?? 'Residential', style: TextStyle(color: AppTheme.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text(account.tariff, style: TextStyle(color: AppTheme.textLight, fontWeight: FontWeight.w600, fontSize: 13)),
                   ],
                 ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    _buildIdentityBadge('ACCOUNT NO.', account['account']!),
+                    _buildIdentityBadge('ACCOUNT NO.', account.account),
                     const SizedBox(width: 16),
-                    _buildIdentityBadge('METER ID', account['meter']!),
+                    _buildIdentityBadge('METER ID', account.meter),
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactModule() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('CONTACT & LOCATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 2)),
+          const SizedBox(height: 24),
+          const Text('SITE ADDRESS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF64748B), letterSpacing: 1.2)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _addressCtrl,
+            maxLines: 2,
+            style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textDark, fontSize: 14),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              prefixIcon: const Icon(Icons.location_on_rounded, color: AppTheme.primary, size: 18),
+              contentPadding: const EdgeInsets.all(16),
             ),
           ),
         ],

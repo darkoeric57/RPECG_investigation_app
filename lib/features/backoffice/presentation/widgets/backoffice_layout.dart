@@ -20,6 +20,8 @@ import '../pages/billing_account_details_page.dart';
 import '../pages/billing_edit_account_page.dart';
 import '../pages/billing_status_history_page.dart';
 import '../pages/billing_schedule_page.dart';
+import '../pages/billing_analytical_reports_page.dart';
+import '../pages/revenue_analysis_report_page.dart';
 
 class BackofficeLayout extends ConsumerWidget {
   const BackofficeLayout({super.key});
@@ -59,49 +61,22 @@ class BackofficeLayout extends ConsumerWidget {
     );
   }
 
-  Widget _buildPage(BackofficePage page) {
-    try {
-      switch (page) {
-        case BackofficePage.dashboard:
-          return const DashboardPage();
-        case BackofficePage.dataManagement:
-          return const DataManagementPage();
-        case BackofficePage.investigatorAssignments:
-          return const InvestigatorAssignmentsPage();
-        case BackofficePage.fieldReports:
-          return const FieldReportsPage();
-        case BackofficePage.notificationsChat:
-          return const NotificationsChatPage();
-        case BackofficePage.mapView:
-          return const MapViewPage();
-        case BackofficePage.settings:
-          return const SettingsPage();
-        case BackofficePage.billingDashboard:
-          return const BillingDashboardPage();
-        case BackofficePage.meterDetails:
-          return const MeterDetailsSummaryPage();
-        case BackofficePage.editInvestigation:
-          return const EditInvestigationPage();
-        case BackofficePage.billingAccountDetails:
-          return const BillingAccountDetailsPage();
-        case BackofficePage.billingEditAccount:
-          return const BillingEditAccountPage();
-        case BackofficePage.billingStatusHistory:
-          return const BillingStatusHistoryPage();
-        case BackofficePage.billingSchedule:
-          return const BillingSchedulePage();
-      }
-    } catch (e) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 64),
-            const SizedBox(height: 16),
-            Text('Error loading page: $e'),
-          ],
-        ),
-      );
-    }
-  }
+  Widget _buildPage(BackofficePage page) => switch (page) {
+      BackofficePage.dashboard => const DashboardPage(),
+      BackofficePage.dataManagement => const DataManagementPage(),
+      BackofficePage.investigatorAssignments => const InvestigatorAssignmentsPage(),
+      BackofficePage.fieldReports => const FieldReportsPage(),
+      BackofficePage.notificationsChat => const NotificationsChatPage(),
+      BackofficePage.mapView => const MapViewPage(),
+      BackofficePage.settings => const SettingsPage(),
+      BackofficePage.billingDashboard => const BillingDashboardPage(),
+      BackofficePage.meterDetails => const MeterDetailsSummaryPage(),
+      BackofficePage.editInvestigation => const EditInvestigationPage(),
+      BackofficePage.billingAccountDetails => const BillingAccountDetailsPage(),
+      BackofficePage.billingEditAccount => const BillingEditAccountPage(),
+      BackofficePage.billingStatusHistory => const BillingStatusHistoryPage(),
+      BackofficePage.billingSchedule => const BillingSchedulePage(),
+      BackofficePage.analyticalReports => const BillingAnalyticalReportsPage(),
+      BackofficePage.revenueAnalysisReport => const RevenueAnalysisReportPage(),
+    };
 }

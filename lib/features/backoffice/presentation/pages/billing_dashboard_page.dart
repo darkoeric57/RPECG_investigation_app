@@ -3,11 +3,19 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../domain/active_report.dart';
+import '../../providers/active_report_provider.dart';
+import '../../domain/report_config.dart';
+import '../../../../core/utils/web_utils.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart' as ex;
+import 'package:excel_plus/excel_plus.dart' as ex;
+import '../../../../core/providers.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/firebase_data_service.dart';
+import '../../domain/billing_account.dart';
 import '../providers/backoffice_providers.dart';
 import '../../services/excel_web_worker_service.dart';
+import '../widgets/report_schedule_dialog.dart';
 
 // ... (rest of the file remains the same except for excel usage)
 
@@ -16,7 +24,6 @@ import '../../services/excel_web_worker_service.dart';
 // State providers
 // ---------------------------------------------------------------------------
 final _reportFrequencyProvider = StateProvider<String>((ref) => 'Weekly');
-final _currentPageProvider = StateProvider<int>((ref) => 1);
 final _isImportingProvider = StateProvider<bool>((ref) => false);
 final _importProgressProvider = StateProvider<String>((ref) => '');
 
@@ -127,27 +134,35 @@ class _BillingHeader extends ConsumerWidget {
       );
 
       if (result == null) return;
-      final Uint8List? fileBytes = result.files.first.bytes;
-      if (fileBytes == null) return;
+        final Uint8List? fileBytes = result.files.first.bytes;
+        if (fileBytes == null) return;
+
+        // Capture current date for "File import Date" column
+        final now = DateTime.now();
+        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final importDate = '${months[now.month - 1]} ${now.day.toString().padLeft(2, '0')}, ${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
       ref.read(_isImportingProvider.notifier).state = true;
 
       try {
         // ─────────────────────────────────────────────────────────────────
-        // SheetJS Native Browser Web Worker
-        // web/excel_parser_worker.js runs SheetJS on a REAL separate OS thread.
-        // The Flutter UI stays 100% free — no freezing regardless of file size.
-        // File bytes are transferred (zero-copy) via ArrayBuffer transferables.
+        // Native Dart excel package — no CDN, no web worker required.
+        // Works fully offline and on all platforms.
         // ─────────────────────────────────────────────────────────────────
-        final List<Map<String, String>> newAccounts = await parseExcelInWorker(
-          fileBytes,
-          onProgress: (msg) {
-            ref.read(_importProgressProvider.notifier).state = msg;
-          },
-        );
+        ref.read(_importProgressProvider.notifier).state = 'Parsing Excel file (Background Thread)...';
+        
+        // Restore background parsing using the worker_manager package.
+        // This ensures the UI remains responsive during large file imports.
+        final List<Map<String, String>> newAccounts = await parseExcelInBackground(fileBytes);
 
         if (newAccounts.isNotEmpty) {
-          ref.read(billingAccountsProvider.notifier).state = [...newAccounts];
+          ref.read(_importProgressProvider.notifier).state = 'Saving to Firebase...';
+          
+          final dataService = FirestoreDataService();
+          await dataService.saveBillingAccountsBatch(newAccounts);
+          
+          // Refresh the data from Firebase
+          ref.invalidate(billingAccountsProvider);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -192,6 +207,9 @@ class _BillingHeader extends ConsumerWidget {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 
 class _MetricsRow extends StatelessWidget {
@@ -582,17 +600,40 @@ class _ReportSchedulerCard extends ConsumerWidget {
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton(
+            child: ElevatedButton(
               onPressed: () {
-                ref.read(backofficePageProvider.notifier).state = BackofficePage.billingSchedule;
+                ref.read(backofficePageProvider.notifier).state = BackofficePage.analyticalReports;
               },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1E3A8A),
-                side: const BorderSide(color: Color(0xFFDCE1FF), width: 2),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E3A8A),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
-              child: const Text('Update Schedule Settings', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              child: const Text('View Analytical Reports', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const ReportScheduleDialog(),
+                );
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF64748B),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+              ),
+              child: const Text('Configure Schedule', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -602,11 +643,13 @@ class _ReportSchedulerCard extends ConsumerWidget {
 }
 
 // Tracking Feed Card
-class _TrackingFeedCard extends StatelessWidget {
+class _TrackingFeedCard extends ConsumerWidget {
   const _TrackingFeedCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeReports = ref.watch(activeReportsProvider);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -643,86 +686,96 @@ class _TrackingFeedCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(28),
-            child: Column(
-              children: [
-                _TrackingItem(
-                  category: 'Revenue Analysis',
-                  categoryBg: const Color(0xFFEBF2FF),
-                  categoryColor: Colors.blue[700]!,
-                  title: 'Q4 Initial Projection Draft',
-                  progress: 0.85,
-                  barColor: const Color(0xFF1E3A8A),
-                  statusWidget: Row(
-                    children: const [
-                      _PulsingDot(color: Color(0xFF1E3A8A)),
-                      SizedBox(width: 4),
-                      Text('Analyzing Data (85%)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+            child: activeReports.isEmpty 
+              ? Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.assignment_outlined, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text('No active reports in pipeline', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
+                )
+              : Column(
+                  children: activeReports.map((report) {
+                    final isLast = report == activeReports.last;
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: isLast ? 0 : 28),
+                      child: _TrackingItem(
+                        report: report,
+                        onReview: () => _handleReview(context, report),
+                        onApprove: () => _handleApprove(context, ref, report),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                const SizedBox(height: 28),
-                _TrackingItem(
-                  category: 'Audit Logs',
-                  categoryBg: const Color(0xFFDCFCE7),
-                  categoryColor: Colors.green,
-                  title: 'Monthly Compliance Verification',
-                  progress: 1.0,
-                  barColor: Colors.green,
-                  statusWidget: Row(
-                    children: const [
-                      Icon(Icons.check_circle, size: 14, color: Colors.green),
-                      SizedBox(width: 4),
-                      Text('Draft Ready', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                    ],
-                  ),
-                  actions: [
-                    _SmallBtn(label: 'Review Draft', primary: true, onTap: () {}),
-                    const SizedBox(width: 8),
-                    _SmallBtn(label: 'Approve Report', primary: false, onTap: () {}),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                _TrackingItem(
-                  category: 'Meter Ops',
-                  categoryBg: const Color(0xFFF1F5F9),
-                  categoryColor: Colors.grey,
-                  title: 'Zone-wide Disconnection List',
-                  progress: 0.0,
-                  barColor: Colors.grey[300]!,
-                  statusWidget: const Text('Scheduled for 04:00 AM', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
+
+  void _handleReview(BuildContext context, ActiveReport report) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Review ${report.title}'),
+        content: const Text('This would show a preview of the generated data.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+        ],
+      ),
+    );
+  }
+
+  void _handleApprove(BuildContext context, WidgetRef ref, ActiveReport report) async {
+    ref.read(activeReportsProvider.notifier).approveReport(report.id);
+    
+    // Simulate generation and download
+    final reportService = ref.read(reportServiceProvider);
+    final reportData = await reportService.processData(report.config);
+    final fileBytes = await reportService.generateFile(reportData, report.config.format);
+    
+    final filename = 'RPECG_Final_${report.title.replaceAll(' ', '_')}.${report.config.format.name.toLowerCase()}';
+    final mimeType = report.config.format == ReportFormat.pdf ? 'application/pdf' : 
+                     report.config.format == ReportFormat.excel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 
+                     'text/csv';
+                     
+    WebUtils.downloadBytes(filename, fileBytes, mimeType);
+
+    if (!context.mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Report approved and downloaded: $filename')),
+    );
+  }
 }
 
 class _TrackingItem extends StatelessWidget {
-  final String category;
-  final Color categoryBg;
-  final Color categoryColor;
-  final String title;
-  final double progress;
-  final Color barColor;
-  final Widget statusWidget;
-  final List<Widget>? actions;
+  final ActiveReport report;
+  final VoidCallback onReview;
+  final VoidCallback onApprove;
 
   const _TrackingItem({
-    required this.category,
-    required this.categoryBg,
-    required this.categoryColor,
-    required this.title,
-    required this.progress,
-    required this.barColor,
-    required this.statusWidget,
-    this.actions,
+    required this.report,
+    required this.onReview,
+    required this.onApprove,
   });
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = report.status == ActiveReportStatus.draftReady 
+        ? Colors.green 
+        : (report.status == ActiveReportStatus.approved ? const Color(0xFF1E3A8A) : const Color(0xFF64748B));
+
+    final categoryBg = report.category == 'Revenue' 
+        ? const Color(0xFFEBF2FF) 
+        : (report.category == 'Meter Ops' ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9));
+
+    final categoryColor = report.category == 'Revenue' 
+        ? Colors.blue[700]! 
+        : (report.category == 'Meter Ops' ? Colors.green : Colors.grey);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -736,32 +789,87 @@ class _TrackingItem extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: categoryBg, borderRadius: BorderRadius.circular(4)),
-                  child: Text(category.toUpperCase(),
+                  child: Text(report.category.toUpperCase(),
                       style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: categoryColor)),
                 ),
                 const SizedBox(height: 4),
-                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                Text(report.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
               ],
             ),
-            statusWidget,
+            _buildStatusWidget(report),
           ],
         ),
         const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: progress,
+            value: report.progress,
             backgroundColor: const Color(0xFFF3F3F5),
-            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+            valueColor: AlwaysStoppedAnimation<Color>(statusColor),
             minHeight: 7,
           ),
         ),
-        if (actions != null) ...[
-          const SizedBox(height: 10),
-          Row(children: actions!),
+        if (report.status == ActiveReportStatus.draftReady) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _SmallBtn(label: 'Review Draft', primary: true, onTap: onReview),
+              const SizedBox(width: 8),
+              _SmallBtn(label: 'Approve Report', primary: false, onTap: onApprove),
+            ],
+          ),
+        ] else if (report.status == ActiveReportStatus.approved) ...[
+           const SizedBox(height: 12),
+           const Row(
+            children: [
+              Icon(Icons.check_circle, size: 14, color: Color(0xFF1E3A8A)),
+              SizedBox(width: 4),
+              Text('COMPLETED & DOWNLOADED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A))),
+            ],
+          ),
         ],
       ],
     );
+  }
+
+  Widget _buildStatusWidget(ActiveReport report) {
+    switch (report.status) {
+      case ActiveReportStatus.scheduled:
+        return const Text('Scheduled', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey));
+      case ActiveReportStatus.processing:
+        return Row(
+          children: [
+            const _PulsingDot(color: Color(0xFF1E3A8A)),
+            const SizedBox(width: 4),
+            Text('Processing (${(report.progress * 100).toInt()}%)', 
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+          ],
+        );
+      case ActiveReportStatus.draftReady:
+        return Row(
+          children: const [
+            Icon(Icons.check_circle, size: 14, color: Colors.green),
+            SizedBox(width: 4),
+            Text('Draft Ready', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+          ],
+        );
+      case ActiveReportStatus.approved:
+        return Row(
+          children: const [
+            Icon(Icons.verified, size: 14, color: Color(0xFF1E3A8A)),
+            SizedBox(width: 4),
+            Text('Approved', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+          ],
+        );
+      case ActiveReportStatus.cancelled:
+        return Row(
+          children: const [
+            Icon(Icons.cancel_outlined, size: 14, color: Colors.red),
+            SizedBox(width: 4),
+            Text('Cancelled', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        );
+    }
   }
 }
 
@@ -794,7 +902,7 @@ class _AccountActivitySectionState extends ConsumerState<_AccountActivitySection
     final currentPage = _currentPage > totalPages ? (totalPages > 0 ? totalPages : 1) : _currentPage;
     final startIndex = (currentPage - 1) * _itemsPerPage;
     final endIndex = startIndex + _itemsPerPage;
-    final accounts = allAccounts.isEmpty ? <Map<String, String>>[] : allAccounts.sublist(
+    final accounts = allAccounts.isEmpty ? <BillingAccount>[] : allAccounts.sublist(
       startIndex,
       endIndex > allAccounts.length ? allAccounts.length : endIndex,
     );
@@ -912,7 +1020,7 @@ class _AccountActivitySectionState extends ConsumerState<_AccountActivitySection
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final double width = constraints.maxWidth < 1100 ? 1100.0 : constraints.maxWidth;
+                final double width = constraints.maxWidth < 1250 ? 1250.0 : constraints.maxWidth;
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
@@ -937,6 +1045,7 @@ class _AccountActivitySectionState extends ConsumerState<_AccountActivitySection
                             _TH(label: 'Tariff', flex: 1),
                             _TH(label: 'Created At', flex: 1),
                             _TH(label: 'Date Scheduled', flex: 1),
+                            _TH(label: 'File import Date', flex: 1),
                             _TH(label: 'Actions', flex: 1),
                           ],
                         ),
@@ -1040,19 +1149,19 @@ class _TH extends StatelessWidget {
 }
 
 class _AccountRow extends ConsumerWidget {
-  final Map<String, String> data;
+  final BillingAccount data;
   final bool isEven;
   const _AccountRow({required this.data, required this.isEven});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = data['status']!;
+    final status = data.status;
     final isOverdue = status == 'Overdue';
     final isPaid = status == 'Paid';
     final isScheduled = status == 'Scheduled';
     final isPending = status == 'Pending';
 
-    final initials = data['initials']!;
+    final initials = data.initials;
     
     // Circle styling for avatar
     final avatarBg = isOverdue
@@ -1093,20 +1202,20 @@ class _AccountRow extends ConsumerWidget {
                 child: Text(initials, style: TextStyle(color: avatarText, fontWeight: FontWeight.w900, fontSize: 11))
               ),
               const SizedBox(width: 12),
-              Flexible(child: Text(data['name']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)))),
+              Flexible(child: Text(data.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)))),
             ]),
           )),
           Expanded(flex: 2, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(data['meter']!, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                Text(data.meter, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF475569), fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text(data['account']!, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                Text(data.account, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
               ]),
           )),
           Expanded(flex: 1, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(data['consumption']!, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+            child: Text(data.consumption, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
           )),
           Expanded(flex: 2, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1119,7 +1228,7 @@ class _AccountRow extends ConsumerWidget {
                       color: const Color(0xFFF1F5F9), 
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(data['fraud_status']!, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                    child: Text(data.fraudStatus, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
                   ),
                 ),
               ],
@@ -1137,7 +1246,7 @@ class _AccountRow extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: const Color(0xFFD8B4FE)),
                     ),
-                    child: Text(data['total_amount']!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF6B21A8))),
+                    child: Text('GHS ${data.totalAmount}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF6B21A8))),
                   ),
                 ),
               ],
@@ -1155,7 +1264,7 @@ class _AccountRow extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: const Color(0xFFBEF264)),
                     ),
-                    child: Text(data['amount_paid'] ?? '—', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF3F6212))),
+                    child: Text('GHS ${data.amountPaid}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF3F6212))),
                   ),
                 ),
               ],
@@ -1173,7 +1282,7 @@ class _AccountRow extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: const Color(0xFF7DD3FC)),
                     ),
-                    child: Text(data['fraud_bill_status'] ?? '—', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0369A1))),
+                    child: Text(data.fraudBillStatus, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0369A1))),
                   ),
                 ),
               ],
@@ -1186,7 +1295,7 @@ class _AccountRow extends ConsumerWidget {
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isOverdue ? const Color(0xFFEF4444) : (isPaid ? const Color(0xFF10B981) : const Color(0xFF0F172A))),
                 children: [
                   const TextSpan(text: 'GHS ', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF64748B), fontSize: 10)),
-                  TextSpan(text: data['balance']!.replaceFirst('GHS ', '')),
+                  TextSpan(text: data.balance),
                 ],
               ),
             ),
@@ -1199,12 +1308,12 @@ class _AccountRow extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: data['tariff'] == 'Non-Residential' ? const Color(0xFF1E3A8A).withValues(alpha: 0.08) : Colors.grey[200],
+                      color: data.tariff == 'Non-Residential' ? const Color(0xFF1E3A8A).withValues(alpha: 0.08) : Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(data['tariff']!,
+                    child: Text(data.tariff,
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold,
-                            color: data['tariff'] == 'Non-Residential' ? const Color(0xFF1E3A8A) : Colors.grey[700])),
+                            color: data.tariff == 'Non-Residential' ? const Color(0xFF1E3A8A) : Colors.grey[700])),
                   ),
                 ),
               ],
@@ -1212,11 +1321,15 @@ class _AccountRow extends ConsumerWidget {
           )),
           Expanded(flex: 1, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(data['created_at'] ?? '—', style: const TextStyle(fontSize: 11, color: Color(0xFF444651))),
+            child: Text(data.createdAt, style: const TextStyle(fontSize: 11, color: Color(0xFF444651))),
           )),
           Expanded(flex: 1, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(data['scheduled'] ?? '—', style: const TextStyle(fontSize: 11, color: Color(0xFF444651))),
+            child: Text(data.scheduled, style: const TextStyle(fontSize: 11, color: Color(0xFF444651))),
+          )),
+          Expanded(flex: 1, child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(data.importedAt != null ? '${data.importedAt!.day}/${data.importedAt!.month}/${data.importedAt!.year}' : '—', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
           )),
           Expanded(flex: 1, child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1779,7 +1892,7 @@ class _SmallBtn extends StatelessWidget {
   }
 }
 
-void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Map<String, String> account) {
+void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, BillingAccount account) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -1861,7 +1974,7 @@ void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Map<Stri
                         const SizedBox(width: 12),
                         Flexible(
                           child: Text(
-                            '${account['name']} (${account['account']})',
+                            '${account.name} (${account.account})',
                             style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w700, fontSize: 13),
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
@@ -1912,15 +2025,46 @@ void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Map<Stri
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Mock deletion for now
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Account ${account['account']} deleted successfully.'),
-                            backgroundColor: const Color(0xFF0F172A),
-                          ),
-                        );
+                      onPressed: () async {
+                        try {
+                          if (account.id != null) {
+                            final dataService = FirestoreDataService();
+                            await dataService.deleteBillingAccount(account.id!);
+                            
+                            // Force a refresh of the billing accounts list
+                            ref.invalidate(billingAccountsProvider);
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Account ${account.account} deleted successfully.'),
+                                  backgroundColor: const Color(0xFF0F172A),
+                                ),
+                              );
+                            }
+                          } else {
+                            // If it's mock data or missing ID, notify the user
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cannot delete mock record. Only records stored in Firebase can be deleted.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              Navigator.pop(context);
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Deletion failed: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 20),
@@ -1993,7 +2137,7 @@ List<Map<String, String>> _excelParseWorker(Uint8List fileBytes) {
           }
         }
         final encoded = ZipEncoder().encode(newArchive);
-        patchedBytes = encoded != null ? Uint8List.fromList(encoded) : fileBytes;
+        patchedBytes = Uint8List.fromList(encoded);
       } else {
         patchedBytes = fileBytes;
       }
@@ -2087,6 +2231,7 @@ List<Map<String, String>> _excelParseWorker(Uint8List fileBytes) {
         'scheduled':         v(iSched),
         'created_at':        v(iCreated),
         'status':            v(iStatus),
+        'address':           '—',
       });
     }
     break; // use the first non-empty sheet only
@@ -2150,6 +2295,7 @@ Future<Map<String, dynamic>?> _prepareSheetData(Uint8List fileBytes) async {
       'idxScheduledDate': findIdx(['scheduled date', 'scheduled', 'date scheduled']),
       'idxCreatedDate': findIdx(['created date', 'created', 'date created', 'timestamp', 'created at']),
       'idxStatus': findIdx(['status', 'billing status', 'payment status']),
+      'idxAddress': findIdx(['address', 'location', 'site', 'customer address']),
     };
 
     // Step 4: Pre-convert ALL cells to strings (lightweight, avoids re-decoding later)
@@ -2194,6 +2340,7 @@ List<Map<String, String>> _parseRowsChunk({
   final int idxScheduledDate = headerInfo['idxScheduledDate']!;
   final int idxCreatedDate = headerInfo['idxCreatedDate']!;
   final int idxStatus = headerInfo['idxStatus']!;
+  final int idxAddress = headerInfo['idxAddress']!;
 
   String val(List<String> row, int col) {
     if (col < 0 || row.length <= col) return '—';
@@ -2241,6 +2388,7 @@ List<Map<String, String>> _parseRowsChunk({
       'scheduled': val(row, idxScheduledDate),
       'created_at': val(row, idxCreatedDate),
       'status': val(row, idxStatus),
+      'address': val(row, idxAddress),
     });
   }
   return results;
@@ -2295,7 +2443,7 @@ Uint8List _patchExcelNumFmtIds(Uint8List bytes) {
     }
 
     final encoded = ZipEncoder().encode(newArchive);
-    if (encoded != null) return Uint8List.fromList(encoded);
+    return Uint8List.fromList(encoded);
   } catch (_) {}
   return bytes;
 }

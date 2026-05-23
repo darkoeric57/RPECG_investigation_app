@@ -11,7 +11,7 @@ import '../../features/auth/presentation/signup_screen.dart';
 import '../../shared_widgets/persistent_nav_bar.dart';
 import '../../features/dashboard/presentation/analytics_screen.dart';
 
-import '../../core/services/backendless_auth_service.dart';
+import '../../core/services/firebase_auth_service.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -21,7 +21,7 @@ class AppRouter {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) async {
-      final authService = BackendlessAuthService();
+      final authService = FirebaseAuthService();
       final bool loggedIn = await authService.isValidLogin();
       final bool loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
 

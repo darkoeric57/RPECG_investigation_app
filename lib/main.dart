@@ -8,22 +8,33 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'features/meters/domain/meter.dart';
 import 'features/backoffice/domain/installment.dart';
 import 'features/dashboard/domain/investigator.dart';
-import 'package:backendless_sdk/backendless_sdk.dart';
-import 'core/config/app_config.dart';
-import 'core/services/backendless_auth_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'core/services/firebase_auth_service.dart';
 // import 'main.reflectable.dart';
 import 'package:google_sign_in/google_sign_in.dart' as gsi;
 import 'core/utils/web_utils.dart';
 import 'package:worker_manager/worker_manager.dart';
+import 'core/config/app_config.dart';
 
 // Google Sign In configuration
 final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await workerManager.init();
-  // initializeReflectable();
   
+  debugPrint('FIREBASE_INIT: Initializing Firebase');
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('FIREBASE_INIT: Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('FIREBASE_INIT: ERROR: Firebase initialization failed: $e');
+  }
+
+  await workerManager.init();
+
   debugPrint('BACKENDLESS_AUTH_DEBUG: main() started');
 
   // Initialize Google Sign In
@@ -45,29 +56,14 @@ void main() async {
   
   // Startup Diagnostic
   try {
-    final authService = BackendlessAuthService();
-    final hasCreds = await authService.hasOfflineCredentials();
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Startup check - has credentials in file: $hasCreds');
+    final authService = FirebaseAuthService();
+    final isLoggedIn = await authService.isLoggedIn();
+    debugPrint('FIREBASE_AUTH_DEBUG: Startup check - is logged in: $isLoggedIn');
   } catch (e) {
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Startup check failed: $e');
+    debugPrint('FIREBASE_AUTH_DEBUG: Startup check failed: $e');
   }
   
-  // Initialize Backendless
-  debugPrint('BACKENDLESS_AUTH_DEBUG: Initializing Backendless');
-  try {
-    await Backendless.initApp(
-      applicationId: AppConfig.backendlessApplicationId,
-      iosApiKey: AppConfig.backendlessIosApiKey,
-      androidApiKey: AppConfig.backendlessAndroidApiKey,
-      jsApiKey: AppConfig.backendlessJsApiKey,
-    );
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Backendless initialized successfully');
-  } catch (e) {
-    debugPrint('BACKENDLESS_AUTH_DEBUG: ERROR: Backendless initialization failed: $e');
-    debugPrint('BACKENDLESS_AUTH_DEBUG: Switching to MOCK AUTH MODE due to initialization failure.');
-    BackendlessAuthService.useMock = true;
-  }
-  
+  // Removed redundant Firebase initialization here
   // Register Adapters
   Hive.registerAdapter(MeterStatusAdapter());
   Hive.registerAdapter(TariffActivityAdapter());
@@ -86,7 +82,7 @@ void main() async {
 
   // Pre-load user session if it exists
   final container = ProviderContainer();
-  final authService = BackendlessAuthService();
+  final authService = FirebaseAuthService();
   try {
     debugPrint('BACKENDLESS_AUTH_DEBUG: Checking for valid login');
     if (await authService.isValidLogin()) {

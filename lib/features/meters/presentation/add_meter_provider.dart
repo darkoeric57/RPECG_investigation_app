@@ -18,7 +18,6 @@ class AddMeterState {
   final String initialReadings;
   final String meterId;
   final String spnNumber;
-  final String meterBrand;
   final String meterRating;
   final String meterPhase;
   final String meteringType;
@@ -41,7 +40,6 @@ class AddMeterState {
     this.initialReadings = '',
     this.meterId = '',
     this.spnNumber = '',
-    this.meterBrand = '',
     this.meterRating = '',
     this.meterPhase = '1-Phase',
     this.meteringType = 'Postpaid',
@@ -55,7 +53,7 @@ class AddMeterState {
   bool get isStep1Valid =>
       customerName.isNotEmpty && address.isNotEmpty && telephone.isNotEmpty;
 
-  bool get isStep2Valid => meterId.isNotEmpty && meterBrand.isNotEmpty;
+  bool get isStep2Valid => meterId.isNotEmpty;
 
   Map<String, dynamic> toMap() {
     return {
@@ -71,7 +69,6 @@ class AddMeterState {
       'initialReadings': initialReadings,
       'meterId': meterId,
       'spnNumber': spnNumber,
-      'meterBrand': meterBrand,
       'meterRating': meterRating,
       'meterPhase': meterPhase,
       'meteringType': meteringType,
@@ -103,7 +100,6 @@ class AddMeterState {
       initialReadings: map['initialReadings'] ?? '',
       meterId: map['meterId'] ?? '',
       spnNumber: map['spnNumber'] ?? '',
-      meterBrand: map['meterBrand'] ?? '',
       meterRating: map['meterRating'] ?? '',
       meterPhase: map['meterPhase'] ?? '1-Phase',
       meteringType: map['meteringType'] ?? 'Postpaid',
@@ -126,7 +122,6 @@ class AddMeterState {
     String? initialReadings,
     String? meterId,
     String? spnNumber,
-    String? meterBrand,
     String? meterRating,
     String? meterPhase,
     String? meteringType,
@@ -149,7 +144,6 @@ class AddMeterState {
       initialReadings: initialReadings ?? this.initialReadings,
       meterId: meterId ?? this.meterId,
       spnNumber: spnNumber ?? this.spnNumber,
-      meterBrand: meterBrand ?? this.meterBrand,
       meterRating: meterRating ?? this.meterRating,
       meterPhase: meterPhase ?? this.meterPhase,
       meteringType: meteringType ?? this.meteringType,
@@ -245,10 +239,6 @@ class AddMeterNotifier extends Notifier<AddMeterState> {
     _saveDraft();
   }
 
-  void updateMeterBrand(String val) {
-    state = state.copyWith(meterBrand: val);
-    _saveDraft();
-  }
 
   void updateMeterRating(String val) {
     state = state.copyWith(meterRating: val);
