@@ -63,7 +63,9 @@ class ReportService {
   }
 
   Future<ReportData> processData(ReportConfig config) async {
-    if (config.type == ReportType.revenue) {
+    if (config.type == ReportType.revenue ||
+        config.type == ReportType.consumption ||
+        config.type == ReportType.tariff) {
       final allAccounts = await _firestoreDataService.getBillingAccounts();
       final filteredAccounts = allAccounts.where((account) {
         // 1. Date Filtering
@@ -191,13 +193,14 @@ class ReportService {
           'TARIFF': account.tariff,
           'CUSTOMER NAME': account.name,
           'DATE': account.createdAt,
+          'CONSUMPTION': account.consumption,
         };
       }).toList();
 
       final summary = const RevenueAnalysisEngine().run(rawRows);
 
       return ReportData(
-        type: ReportType.revenue,
+        type: config.type,
         meters: [],
         totalConsumption: 0.0,
         statusCounts: {},
@@ -269,6 +272,26 @@ class ReportService {
           return RevenueReportExporter.toPDF(summary);
         case ReportFormat.excel:
           return RevenueReportExporter.toExcel(summary);
+      }
+    } else if (data.type == ReportType.consumption) {
+      final summary = data.revenueSummary ?? RevenueAnalysisSummary(ledgers: [], generatedAt: DateTime.now());
+      switch (format) {
+        case ReportFormat.csv:
+          return RevenueReportExporter.toConsumptionCSV(summary);
+        case ReportFormat.pdf:
+          return RevenueReportExporter.toConsumptionPDF(summary);
+        case ReportFormat.excel:
+          return RevenueReportExporter.toConsumptionExcel(summary);
+      }
+    } else if (data.type == ReportType.tariff) {
+      final summary = data.revenueSummary ?? RevenueAnalysisSummary(ledgers: [], generatedAt: DateTime.now());
+      switch (format) {
+        case ReportFormat.csv:
+          return RevenueReportExporter.toTariffCSV(summary);
+        case ReportFormat.pdf:
+          return RevenueReportExporter.toTariffPDF(summary);
+        case ReportFormat.excel:
+          return RevenueReportExporter.toTariffExcel(summary);
       }
     }
 

@@ -75,6 +75,7 @@ class RevenueAnalysisEngine {
         double runningOutstanding = 0.0;
         double totalBilled = 0.0;
         double totalPaid = 0.0;
+        double totalConsumption = 0.0;
         String lastFraudBillStatus = '—';
         String lastTariff = 'Unknown';
         String lastCustomerName = 'Unknown';
@@ -122,6 +123,7 @@ class RevenueAnalysisEngine {
 
             totalBilled += cycle.totalAmount;
             totalPaid += cycle.amountPaid;
+            totalConsumption += cycle.consumption;
 
             cycle.outstandingBalance = cycleOutstanding.clamp(0.0, double.infinity);
             cycle.settlementStatus = _resolveStatus(
@@ -163,6 +165,7 @@ class RevenueAnalysisEngine {
           isSettled: isSettled,
           isAccountMeterValid: isAccountMeterValid,
           cycles: cycles,
+          totalConsumption: totalConsumption,
         ));
       }
     }

@@ -43,6 +43,9 @@ class RevenueRecord {
   /// Timestamp/Date of this record (for chronological ordering).
   final DateTime? date;
 
+  /// Consumption in kWh.
+  final double consumption;
+
   /// Running outstanding balance AFTER this record is processed.
   /// Populated by the engine; not present in raw source data.
   double outstandingBalance;
@@ -62,6 +65,7 @@ class RevenueRecord {
     required this.tariff,
     required this.customerName,
     required this.fraudType,
+    required this.consumption,
     this.date,
     this.outstandingBalance = 0.0,
     this.isAccountMeterValid = true,
@@ -94,6 +98,14 @@ class RevenueRecord {
       return double.tryParse(cleaned) ?? 0.0;
     }
 
+    double parseKwh(String raw) {
+      if (raw.isEmpty) return 0.0;
+      final cleaned = raw
+          .replaceAll(RegExp(r'[kwhKWH\s]'), '')
+          .replaceAll(',', '');
+      return double.tryParse(cleaned) ?? 0.0;
+    }
+
     final meterNumber = get(['METER NUMBER', 'Meter Number', 'meter', 'meter_number', 'METER']);
     final accountNumber = get(['ACCOUNT NUMBER', 'Account Number', 'account', 'account_number', 'ACCOUNT']);
     final totalRaw = get(['TOTAL AMOUNT', 'Total Amount', 'total', 'total_amount', 'AMOUNT']);
@@ -103,6 +115,7 @@ class RevenueRecord {
     final tariff = get(['TARIFF', 'tariff', 'tariff_class', 'TARIFF CLASS', 'Tariff']);
     final customerName = get(['CUSTOMER NAME', 'Customer Name', 'name', 'customer_name', 'CUSTOMER', 'NAME']);
     final dateRaw = get(['DATE', 'Date', 'created_at', 'CREATED AT', 'imported_at', 'IMPORTED AT', 'importedAt']);
+    final consumptionRaw = get(['CONSUMPTION', 'consumption', 'kwh', 'usage', 'USAGE', 'kwh_consumed', 'KWH']);
 
     return RevenueRecord(
       meterNumber: meterNumber,
@@ -114,6 +127,7 @@ class RevenueRecord {
       customerName: customerName.isEmpty ? 'Unknown' : customerName,
       fraudType: fraudType.isEmpty ? 'Normal' : fraudType,
       date: _parseDate(dateRaw),
+      consumption: parseKwh(consumptionRaw),
     );
   }
 }
@@ -145,6 +159,9 @@ class AccountLedger {
   /// All individual cycle records (in order) for drill-down.
   final List<RevenueRecord> cycles;
 
+  /// Total consumption in kWh across ALL billing cycles.
+  final double totalConsumption;
+
   AccountLedger({
     required this.meterNumber,
     required this.accountNumber,
@@ -158,6 +175,7 @@ class AccountLedger {
     required this.isSettled,
     required this.isAccountMeterValid,
     required this.cycles,
+    required this.totalConsumption,
   });
 
   String get settlementStatus {

@@ -39,6 +39,8 @@ class BackofficeTopBar extends ConsumerWidget {
         BackofficePage.billingSchedule => 'Schedule Payment Date',
         BackofficePage.analyticalReports => 'Analytical Reports',
         BackofficePage.revenueAnalysisReport => 'Revenue Analysis Report',
+        BackofficePage.consumptionReport => 'Consumption Analysis Report',
+        BackofficePage.tariffActivityReport => 'Tariff Activity Analysis Report',
       };
 
     return Container(

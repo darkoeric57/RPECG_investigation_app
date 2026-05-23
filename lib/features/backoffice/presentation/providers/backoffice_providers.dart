@@ -24,6 +24,8 @@ enum BackofficePage {
   billingSchedule,
   analyticalReports,
   revenueAnalysisReport,
+  consumptionReport,
+  tariffActivityReport,
 }
 
 final backofficePageProvider =

@@ -340,4 +340,550 @@ class RevenueReportExporter {
     final bytes = excel.encode();
     return Uint8List.fromList(bytes ?? []);
   }
+
+  // ── Consumption Report Exports ──────────────────────────────────────────────
+
+  static Uint8List toConsumptionCSV(RevenueAnalysisSummary summary) {
+    final buf = StringBuffer();
+
+    // Header
+    buf.writeln(
+      'Customer Name,Meter Number,Account Number,Total Consumption (kWh),'
+      'Average Consumption (kWh),Minimum Consumption (kWh),Maximum Consumption (kWh),'
+      'Tariff,Status,Valid Account-Meter',
+    );
+
+    for (final ledger in summary.ledgers) {
+      final uniqueCycles = <RevenueRecord>[];
+      for (final cycle in ledger.cycles) {
+        if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+          uniqueCycles.add(cycle);
+        }
+      }
+      final consumptionList = uniqueCycles.map((c) => c.consumption).toList();
+      final double total = ledger.totalConsumption;
+      final double min = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a < b ? a : b);
+      final double max = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a > b ? a : b);
+      final double avg = consumptionList.isEmpty ? 0.0 : total / consumptionList.length;
+
+      buf.writeln([
+        _csv(ledger.customerName),
+        _csv(ledger.meterNumber),
+        _csv(ledger.accountNumber),
+        total.toStringAsFixed(2),
+        avg.toStringAsFixed(2),
+        min.toStringAsFixed(2),
+        max.toStringAsFixed(2),
+        _csv(ledger.tariff),
+        _csv(ledger.settlementStatus),
+        ledger.isAccountMeterValid ? 'Yes' : 'NO - MISMATCH',
+      ].join(','));
+    }
+
+    buf.writeln();
+    buf.writeln('=== CONSUMPTION ANALYSIS SUMMARY ===');
+    buf.writeln('Generated At,${summary.generatedAt.toIso8601String()}');
+    buf.writeln('Total Accounts,${summary.totalAccounts}');
+    
+    double grandTotalConsumption = 0.0;
+    double grandMaxConsumption = 0.0;
+    int activeAccounts = 0;
+    for (final ledger in summary.ledgers) {
+      grandTotalConsumption += ledger.totalConsumption;
+      if (ledger.totalConsumption > 0) activeAccounts++;
+      final uniqueCycles = <RevenueRecord>[];
+      for (final cycle in ledger.cycles) {
+        if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+          uniqueCycles.add(cycle);
+        }
+      }
+      for (final c in uniqueCycles) {
+        if (c.consumption > grandMaxConsumption) {
+          grandMaxConsumption = c.consumption;
+        }
+      }
+    }
+    final double grandAvgConsumption = summary.ledgers.isEmpty ? 0.0 : grandTotalConsumption / summary.ledgers.length;
+
+    buf.writeln('Grand Total Consumption (kWh),${grandTotalConsumption.toStringAsFixed(2)}');
+    buf.writeln('Grand Average Consumption (kWh),${grandAvgConsumption.toStringAsFixed(2)}');
+    buf.writeln('Grand Max Consumption (kWh),${grandMaxConsumption.toStringAsFixed(2)}');
+    buf.writeln('Active Accounts,${activeAccounts}');
+
+    return Uint8List.fromList(utf8.encode(buf.toString()));
+  }
+
+  static Future<Uint8List> toConsumptionPDF(RevenueAnalysisSummary summary) async {
+    final pdf = pw.Document();
+    final dateStr = DateFormat('dd MMM yyyy, HH:mm').format(summary.generatedAt);
+
+    final headerStyle = pw.TextStyle(
+      fontWeight: pw.FontWeight.bold,
+      fontSize: 7,
+      color: PdfColors.white,
+    );
+    final cellStyle = pw.TextStyle(fontSize: 7);
+
+    // Amber Palette
+    final headerBg = PdfColor.fromInt(0xFFD97706); // Amber 600
+    final mismatchColor = PdfColor.fromInt(0xFFF59E0B);
+    final oddRow = PdfColor.fromInt(0xFFFFFBEB); // Amber 50
+
+    double grandTotalConsumption = 0.0;
+    double grandMaxConsumption = 0.0;
+    int activeAccounts = 0;
+    for (final ledger in summary.ledgers) {
+      grandTotalConsumption += ledger.totalConsumption;
+      if (ledger.totalConsumption > 0) activeAccounts++;
+      final uniqueCycles = <RevenueRecord>[];
+      for (final cycle in ledger.cycles) {
+        if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+          uniqueCycles.add(cycle);
+        }
+      }
+      for (final c in uniqueCycles) {
+        if (c.consumption > grandMaxConsumption) {
+          grandMaxConsumption = c.consumption;
+        }
+      }
+    }
+    final double grandAvgConsumption = summary.ledgers.isEmpty ? 0.0 : grandTotalConsumption / summary.ledgers.length;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: const pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.symmetric(horizontal: 30, vertical: 36),
+        ),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'RPECG — Consumption Analysis Report',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 16,
+                    color: headerBg,
+                  ),
+                ),
+                pw.Text(dateStr, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+              ],
+            ),
+            pw.Divider(color: PdfColor.fromInt(0xFFE2E8F0)),
+          ],
+        ),
+        build: (_) => [
+          // KPI cards
+          pw.Row(
+            children: [
+              _pdfKpi('Total Consumption', '${grandTotalConsumption.toStringAsFixed(1)} kWh', headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Average Consumption', '${grandAvgConsumption.toStringAsFixed(1)} kWh', headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Max Consumption', '${grandMaxConsumption.toStringAsFixed(1)} kWh', headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Active Accounts', '$activeAccounts', headerBg),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+
+          // Data table
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.5), // Customer Name
+              1: const pw.FlexColumnWidth(1.6), // Meter
+              2: const pw.FlexColumnWidth(1.6), // Account
+              3: const pw.FlexColumnWidth(1.8), // Total Consumption
+              4: const pw.FlexColumnWidth(1.8), // Avg Consumption
+              5: const pw.FlexColumnWidth(1.5), // Tariff
+              6: const pw.FlexColumnWidth(1.2), // Status
+            },
+            children: [
+              // Header row
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: headerBg),
+                children: [
+                  'Customer Name', 'Meter Number', 'Account Number', 'Total Consumption (kWh)',
+                  'Avg Consumption', 'Tariff', 'Status',
+                ].map((h) => _pdfHeaderCell(h, headerStyle)).toList(),
+              ),
+              // Data rows
+              ...summary.ledgers.asMap().entries.map((e) {
+                final i = e.key;
+                final l = e.value;
+                final isOdd = i.isOdd;
+                PdfColor? rowBg;
+                if (!l.isAccountMeterValid) {
+                  rowBg = mismatchColor.shade(0.15);
+                } else if (isOdd) {
+                  rowBg = oddRow;
+                }
+
+                final uniqueCycles = <RevenueRecord>[];
+                for (final cycle in l.cycles) {
+                  if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+                    uniqueCycles.add(cycle);
+                  }
+                }
+                final double total = l.totalConsumption;
+                final double avg = uniqueCycles.isEmpty ? 0.0 : total / uniqueCycles.length;
+
+                return pw.TableRow(
+                  decoration: pw.BoxDecoration(color: rowBg),
+                  children: [
+                    l.customerName,
+                    l.meterNumber,
+                    l.accountNumber,
+                    '${total.toStringAsFixed(1)} kWh',
+                    '${avg.toStringAsFixed(1)} kWh',
+                    l.tariff,
+                    l.settlementStatus,
+                  ].map((text) => _pdfCell(text, cellStyle)).toList(),
+                );
+              }),
+            ],
+          ),
+
+          // Disclaimer
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'This report was auto-generated by the RPECG Consumption Analysis Engine. '
+            'All figures are derived from imported billing data. Consumption metrics represent unique billing records.',
+            style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Uint8List toConsumptionExcel(RevenueAnalysisSummary summary) {
+    final excel = Excel.createExcel();
+    final sheet = excel['Consumption Analysis'];
+
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Customer Name', 'Meter Number', 'Account Number', 'Total Consumption (kWh)',
+      'Average Consumption (kWh)', 'Minimum Consumption (kWh)', 'Maximum Consumption (kWh)',
+      'Tariff', 'Settlement Status', 'Valid Account-Meter',
+    ];
+
+    for (var col = 0; col < headers.length; col++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+      cell.value = TextCellValue(headers[col]);
+      cell.cellStyle = CellStyle(
+        bold: true,
+        backgroundColorHex: ExcelColor.fromHexString('#D97706'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+      );
+    }
+
+    for (var i = 0; i < summary.ledgers.length; i++) {
+      final l = summary.ledgers[i];
+      final row = i + 1;
+
+      final bgHex = !l.isAccountMeterValid ? '#FFFBEB' : (i.isOdd ? '#FFFBEB' : '#FFFFFF');
+
+      void writeCell(int col, CellValue val) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+        cell.value = val;
+        cell.cellStyle = CellStyle(backgroundColorHex: ExcelColor.fromHexString(bgHex));
+      }
+
+      final uniqueCycles = <RevenueRecord>[];
+      for (final cycle in l.cycles) {
+        if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+          uniqueCycles.add(cycle);
+        }
+      }
+      final consumptionList = uniqueCycles.map((c) => c.consumption).toList();
+      final double total = l.totalConsumption;
+      final double min = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a < b ? a : b);
+      final double max = consumptionList.isEmpty ? 0.0 : consumptionList.reduce((a, b) => a > b ? a : b);
+      final double avg = consumptionList.isEmpty ? 0.0 : total / consumptionList.length;
+
+      writeCell(0, TextCellValue(l.customerName));
+      writeCell(1, TextCellValue(l.meterNumber));
+      writeCell(2, TextCellValue(l.accountNumber));
+      writeCell(3, DoubleCellValue(total));
+      writeCell(4, DoubleCellValue(avg));
+      writeCell(5, DoubleCellValue(min));
+      writeCell(6, DoubleCellValue(max));
+      writeCell(7, TextCellValue(l.tariff));
+      writeCell(8, TextCellValue(l.settlementStatus));
+      writeCell(9, TextCellValue(l.isAccountMeterValid ? 'Yes' : 'MISMATCH'));
+    }
+
+    // Summary sheet
+    final sumSheet = excel['Summary'];
+    void sumRow(int row, String label, String value) {
+      sumSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
+          TextCellValue(label);
+      sumSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
+          TextCellValue(value);
+    }
+
+    double grandTotalConsumption = 0.0;
+    double grandMaxConsumption = 0.0;
+    int activeAccounts = 0;
+    for (final ledger in summary.ledgers) {
+      grandTotalConsumption += ledger.totalConsumption;
+      if (ledger.totalConsumption > 0) activeAccounts++;
+      final uniqueCycles = <RevenueRecord>[];
+      for (final cycle in ledger.cycles) {
+        if (!uniqueCycles.any((p) => p.totalAmount == cycle.totalAmount)) {
+          uniqueCycles.add(cycle);
+        }
+      }
+      for (final c in uniqueCycles) {
+        if (c.consumption > grandMaxConsumption) {
+          grandMaxConsumption = c.consumption;
+        }
+      }
+    }
+    final double grandAvgConsumption = summary.ledgers.isEmpty ? 0.0 : grandTotalConsumption / summary.ledgers.length;
+
+    sumRow(0, 'Generated At', summary.generatedAt.toIso8601String());
+    sumRow(1, 'Total Accounts', '${summary.totalAccounts}');
+    sumRow(2, 'Grand Total Consumption (kWh)', grandTotalConsumption.toStringAsFixed(2));
+    sumRow(3, 'Grand Average Consumption (kWh)', grandAvgConsumption.toStringAsFixed(2));
+    sumRow(4, 'Grand Max Consumption (kWh)', grandMaxConsumption.toStringAsFixed(2));
+    sumRow(5, 'Active Accounts', '$activeAccounts');
+
+    final bytes = excel.encode();
+    return Uint8List.fromList(bytes ?? []);
+  }
+
+  // ── Tariff Activity Report Exports ──────────────────────────────────────────
+
+  static Uint8List toTariffCSV(RevenueAnalysisSummary summary) {
+    final buf = StringBuffer();
+
+    // Header
+    buf.writeln(
+      'Customer Name,Meter Number,Account Number,Tariff Class,Total Billed (GHS),'
+      'Total Paid (GHS),Recovery Rate (%),Status,Valid Account-Meter',
+    );
+
+    for (final ledger in summary.ledgers) {
+      final double recovery = ledger.totalBilled > 0 ? (ledger.totalPaid / ledger.totalBilled) * 100 : 100.0;
+      buf.writeln([
+        _csv(ledger.customerName),
+        _csv(ledger.meterNumber),
+        _csv(ledger.accountNumber),
+        _csv(ledger.tariff),
+        ledger.totalBilled.toStringAsFixed(2),
+        ledger.totalPaid.toStringAsFixed(2),
+        recovery.toStringAsFixed(2),
+        _csv(ledger.settlementStatus),
+        ledger.isAccountMeterValid ? 'Yes' : 'NO - MISMATCH',
+      ].join(','));
+    }
+
+    buf.writeln();
+    buf.writeln('=== TARIFF ACTIVITY SUMMARY ===');
+    buf.writeln('Generated At,${summary.generatedAt.toIso8601String()}');
+    buf.writeln('Total Accounts,${summary.totalAccounts}');
+    buf.writeln('Grand Total Billed,${summary.grandTotalBilled.toStringAsFixed(2)}');
+    buf.writeln('Grand Total Collected,${summary.grandTotalPaid.toStringAsFixed(2)}');
+    buf.writeln('Recovery rate,${_pct.format(summary.collectionRate)}%');
+
+    return Uint8List.fromList(utf8.encode(buf.toString()));
+  }
+
+  static Future<Uint8List> toTariffPDF(RevenueAnalysisSummary summary) async {
+    final pdf = pw.Document();
+    final dateStr = DateFormat('dd MMM yyyy, HH:mm').format(summary.generatedAt);
+
+    final headerStyle = pw.TextStyle(
+      fontWeight: pw.FontWeight.bold,
+      fontSize: 7,
+      color: PdfColors.white,
+    );
+    final cellStyle = pw.TextStyle(fontSize: 7);
+
+    // Purple Palette
+    final headerBg = PdfColor.fromInt(0xFF4F46E5); // Indigo 600
+    final mismatchColor = PdfColor.fromInt(0xFFF59E0B);
+    final oddRow = PdfColor.fromInt(0xFFEEF2FF); // Indigo 50
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: const pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.symmetric(horizontal: 30, vertical: 36),
+        ),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'RPECG — Tariff Activity Analysis Report',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 16,
+                    color: headerBg,
+                  ),
+                ),
+                pw.Text(dateStr, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+              ],
+            ),
+            pw.Divider(color: PdfColor.fromInt(0xFFE2E8F0)),
+          ],
+        ),
+        build: (_) => [
+          // KPI cards
+          pw.Row(
+            children: [
+              _pdfKpi('Active Accounts', '${summary.totalAccounts}', headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Total Billed', _currency.format(summary.grandTotalBilled), headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Total Paid', _currency.format(summary.grandTotalPaid), headerBg),
+              pw.SizedBox(width: 8),
+              _pdfKpi('Recovery Rate', '${_pct.format(summary.collectionRate)}%', headerBg),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+
+          // Data table
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.5), // Customer Name
+              1: const pw.FlexColumnWidth(1.6), // Meter
+              2: const pw.FlexColumnWidth(1.6), // Account
+              3: const pw.FlexColumnWidth(1.8), // Tariff Class
+              4: const pw.FlexColumnWidth(1.5), // Total Billed
+              5: const pw.FlexColumnWidth(1.5), // Total Paid
+              6: const pw.FlexColumnWidth(1.2), // Efficiency
+              7: const pw.FlexColumnWidth(1.2), // Status
+            },
+            children: [
+              // Header row
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: headerBg),
+                children: [
+                  'Customer Name', 'Meter Number', 'Account Number', 'Tariff Class',
+                  'Total Billed', 'Total Paid', 'Efficiency', 'Status',
+                ].map((h) => _pdfHeaderCell(h, headerStyle)).toList(),
+              ),
+              // Data rows
+              ...summary.ledgers.asMap().entries.map((e) {
+                final i = e.key;
+                final l = e.value;
+                final isOdd = i.isOdd;
+                PdfColor? rowBg;
+                if (!l.isAccountMeterValid) {
+                  rowBg = mismatchColor.shade(0.15);
+                } else if (isOdd) {
+                  rowBg = oddRow;
+                }
+
+                final double recovery = l.totalBilled > 0 ? (l.totalPaid / l.totalBilled) * 100 : 100.0;
+
+                return pw.TableRow(
+                  decoration: pw.BoxDecoration(color: rowBg),
+                  children: [
+                    l.customerName,
+                    l.meterNumber,
+                    l.accountNumber,
+                    l.tariff,
+                    _currency.format(l.totalBilled),
+                    _currency.format(l.totalPaid),
+                    '${_pct.format(recovery)}%',
+                    l.settlementStatus,
+                  ].map((text) => _pdfCell(text, cellStyle)).toList(),
+                );
+              }),
+            ],
+          ),
+
+          // Disclaimer
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'This report was auto-generated by the RPECG Tariff Activity Analysis Engine. '
+            'All figures are derived from imported billing data. Recovery rates reflect the payment collection effectiveness.',
+            style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Uint8List toTariffExcel(RevenueAnalysisSummary summary) {
+    final excel = Excel.createExcel();
+    final sheet = excel['Tariff Analysis'];
+
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Customer Name', 'Meter Number', 'Account Number', 'Tariff Class',
+      'Total Billed (GHS)', 'Total Paid (GHS)', 'Recovery Rate (%)',
+      'Settlement Status', 'Valid Account-Meter',
+    ];
+
+    for (var col = 0; col < headers.length; col++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+      cell.value = TextCellValue(headers[col]);
+      cell.cellStyle = CellStyle(
+        bold: true,
+        backgroundColorHex: ExcelColor.fromHexString('#4F46E5'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+      );
+    }
+
+    for (var i = 0; i < summary.ledgers.length; i++) {
+      final l = summary.ledgers[i];
+      final row = i + 1;
+
+      final bgHex = !l.isAccountMeterValid ? '#FFFBEB' : (i.isOdd ? '#EEF2FF' : '#FFFFFF');
+
+      void writeCell(int col, CellValue val) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+        cell.value = val;
+        cell.cellStyle = CellStyle(backgroundColorHex: ExcelColor.fromHexString(bgHex));
+      }
+
+      final double recovery = l.totalBilled > 0 ? (l.totalPaid / l.totalBilled) * 100 : 100.0;
+
+      writeCell(0, TextCellValue(l.customerName));
+      writeCell(1, TextCellValue(l.meterNumber));
+      writeCell(2, TextCellValue(l.accountNumber));
+      writeCell(3, TextCellValue(l.tariff));
+      writeCell(4, DoubleCellValue(l.totalBilled));
+      writeCell(5, DoubleCellValue(l.totalPaid));
+      writeCell(6, DoubleCellValue(recovery));
+      writeCell(7, TextCellValue(l.settlementStatus));
+      writeCell(8, TextCellValue(l.isAccountMeterValid ? 'Yes' : 'MISMATCH'));
+    }
+
+    // Summary sheet
+    final sumSheet = excel['Summary'];
+    void sumRow(int row, String label, String value) {
+      sumSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
+          TextCellValue(label);
+      sumSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
+          TextCellValue(value);
+    }
+
+    sumRow(0, 'Generated At', summary.generatedAt.toIso8601String());
+    sumRow(1, 'Total Accounts', '${summary.totalAccounts}');
+    sumRow(2, 'Grand Total Billed (GHS)', summary.grandTotalBilled.toStringAsFixed(2));
+    sumRow(3, 'Grand Total Collected (GHS)', summary.grandTotalPaid.toStringAsFixed(2));
+    sumRow(4, 'Recovery Rate', '${_pct.format(summary.collectionRate)}%');
+
+    final bytes = excel.encode();
+    return Uint8List.fromList(bytes ?? []);
+  }
 }

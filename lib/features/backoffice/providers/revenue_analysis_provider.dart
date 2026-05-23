@@ -16,15 +16,11 @@ const _engine = RevenueAnalysisEngine();
 
 /// Holds the currently selected ActiveReport to filter/run sequential cycle analysis.
 final activeRevenueReportProvider = StateProvider<ActiveReport?>((ref) => null);
+final activeConsumptionReportProvider = StateProvider<ActiveReport?>((ref) => null);
+final activeTariffReportProvider = StateProvider<ActiveReport?>((ref) => null);
 
-/// Holds raw rows filtered from the billing accounts, driven by the active
-/// report schedule config. Declared as a plain [Provider] (NOT StateProvider)
-/// so that [ref.watch] works reactively inside it.
-final revenueRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
-  // Use valueOrNull: returns [] while Firestore is loading, real data once resolved.
-  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
-  final activeReport = ref.watch(activeRevenueReportProvider);
-
+/// Helper function to filter billing accounts and map them to raw rows.
+List<Map<String, String>> _filterAccounts(List<BillingAccount> accounts, ActiveReport? activeReport) {
   List<BillingAccount> filteredAccounts = accounts;
 
   if (activeReport != null) {
@@ -157,8 +153,27 @@ final revenueRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
       'TARIFF': account.tariff,
       'CUSTOMER NAME': account.name,
       'DATE': account.createdAt,
+      'CONSUMPTION': account.consumption,
     };
   }).toList();
+}
+
+final revenueRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final activeReport = ref.watch(activeRevenueReportProvider);
+  return _filterAccounts(accounts, activeReport);
+});
+
+final consumptionRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final activeReport = ref.watch(activeConsumptionReportProvider);
+  return _filterAccounts(accounts, activeReport);
+});
+
+final tariffRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
+  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final activeReport = ref.watch(activeTariffReportProvider);
+  return _filterAccounts(accounts, activeReport);
 });
 
 /// Parses a date string trying multiple common formats. Returns null if none
@@ -268,3 +283,93 @@ final filteredLedgersProvider = Provider<List<AccountLedger>>((ref) {
 
 /// True while an export operation is in progress.
 final revenueExportLoadingProvider = StateProvider<bool>((ref) => false);
+final consumptionExportLoadingProvider = StateProvider<bool>((ref) => false);
+final tariffExportLoadingProvider = StateProvider<bool>((ref) => false);
+
+// ─── Consumption providers ──────────────────────────────────────────────────
+
+final consumptionAnalysisSummaryProvider =
+    FutureProvider<RevenueAnalysisSummary?>((ref) async {
+  final rows = ref.watch(consumptionRawRowsProvider);
+  if (rows.isEmpty) return null;
+  return await workerManager.execute(() => _engine.run(rows));
+});
+
+final consumptionSearchQueryProvider = StateProvider<String>((ref) => '');
+final consumptionStatusFilterProvider = StateProvider<Set<String>>((ref) => {});
+
+final filteredConsumptionLedgersProvider = Provider<List<AccountLedger>>((ref) {
+  final summaryAsync = ref.watch(consumptionAnalysisSummaryProvider);
+  final summary = summaryAsync.asData?.value;
+  if (summary == null) return [];
+
+  final query = ref.watch(consumptionSearchQueryProvider).trim().toLowerCase();
+  final statusFilter = ref.watch(consumptionStatusFilterProvider);
+
+  var ledgers = summary.ledgers;
+
+  if (query.isNotEmpty) {
+    ledgers = ledgers
+        .where((l) =>
+            l.meterNumber.toLowerCase().contains(query) ||
+            l.accountNumber.toLowerCase().contains(query) ||
+            l.customerName.toLowerCase().contains(query) ||
+            l.tariff.toLowerCase().contains(query) ||
+            l.fraudBillStatus.toLowerCase().contains(query) ||
+            l.fraudType.toLowerCase().contains(query) ||
+            l.settlementStatus.toLowerCase().contains(query))
+        .toList();
+  }
+
+  if (statusFilter.isNotEmpty) {
+    ledgers = ledgers
+        .where((l) => statusFilter.contains(l.settlementStatus))
+        .toList();
+  }
+
+  return ledgers;
+});
+
+// ─── Tariff Activity providers ──────────────────────────────────────────────
+
+final tariffAnalysisSummaryProvider =
+    FutureProvider<RevenueAnalysisSummary?>((ref) async {
+  final rows = ref.watch(tariffRawRowsProvider);
+  if (rows.isEmpty) return null;
+  return await workerManager.execute(() => _engine.run(rows));
+});
+
+final tariffSearchQueryProvider = StateProvider<String>((ref) => '');
+final tariffStatusFilterProvider = StateProvider<Set<String>>((ref) => {});
+
+final filteredTariffLedgersProvider = Provider<List<AccountLedger>>((ref) {
+  final summaryAsync = ref.watch(tariffAnalysisSummaryProvider);
+  final summary = summaryAsync.asData?.value;
+  if (summary == null) return [];
+
+  final query = ref.watch(tariffSearchQueryProvider).trim().toLowerCase();
+  final statusFilter = ref.watch(tariffStatusFilterProvider);
+
+  var ledgers = summary.ledgers;
+
+  if (query.isNotEmpty) {
+    ledgers = ledgers
+        .where((l) =>
+            l.meterNumber.toLowerCase().contains(query) ||
+            l.accountNumber.toLowerCase().contains(query) ||
+            l.customerName.toLowerCase().contains(query) ||
+            l.tariff.toLowerCase().contains(query) ||
+            l.fraudBillStatus.toLowerCase().contains(query) ||
+            l.fraudType.toLowerCase().contains(query) ||
+            l.settlementStatus.toLowerCase().contains(query))
+        .toList();
+  }
+
+  if (statusFilter.isNotEmpty) {
+    ledgers = ledgers
+        .where((l) => statusFilter.contains(l.settlementStatus))
+        .toList();
+  }
+
+  return ledgers;
+});

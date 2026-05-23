@@ -22,6 +22,8 @@ import '../pages/billing_status_history_page.dart';
 import '../pages/billing_schedule_page.dart';
 import '../pages/billing_analytical_reports_page.dart';
 import '../pages/revenue_analysis_report_page.dart';
+import '../pages/consumption_report_page.dart';
+import '../pages/tariff_activity_report_page.dart';
 
 class BackofficeLayout extends ConsumerWidget {
   const BackofficeLayout({super.key});
@@ -78,5 +80,7 @@ class BackofficeLayout extends ConsumerWidget {
       BackofficePage.billingSchedule => const BillingSchedulePage(),
       BackofficePage.analyticalReports => const BillingAnalyticalReportsPage(),
       BackofficePage.revenueAnalysisReport => const RevenueAnalysisReportPage(),
+      BackofficePage.consumptionReport => const ConsumptionReportPage(),
+      BackofficePage.tariffActivityReport => const TariffActivityReportPage(),
     };
 }

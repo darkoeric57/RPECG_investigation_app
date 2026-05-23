@@ -108,54 +108,101 @@ class BillingAnalyticalReportsPage extends ConsumerWidget {
   Widget _buildHeader(BuildContext context, WidgetRef ref) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => ref.read(backofficePageProvider.notifier).state = BackofficePage.billingDashboard,
-                  icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(width: 8),
-                const Text('Billing Intelligence', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
-                const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
-                const Text('Analytical Reports', style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Analytical Reports Dashboard',
-              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -1),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Professional data analysis of utility billing cycles and recovery performance.',
-              style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => ref.read(backofficePageProvider.notifier).state = BackofficePage.billingDashboard,
+                    icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Billing Intelligence', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+                  const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
+                  const Text('Analytical Reports', style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Analytical Reports Dashboard',
+                style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -1),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Professional data analysis of utility billing cycles and recovery performance.',
+                style: TextStyle(fontSize: 15, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 24),
         Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _buildHeaderAction(Icons.calendar_month_rounded, 'Last 30 Days'),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: () {
                 ref.read(backofficePageProvider.notifier).state =
                     BackofficePage.revenueAnalysisReport;
               },
-              icon: const Icon(Icons.account_balance_wallet_rounded, size: 18),
+              icon: const Icon(Icons.receipt_long_rounded, size: 14),
               label: const Text('Revenue Analysis'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
+                backgroundColor: const Color(0xFF1E3A8A),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(backofficePageProvider.notifier).state =
+                    BackofficePage.consumptionReport;
+              },
+              icon: const Icon(Icons.bolt_rounded, size: 14),
+              label: const Text('Consumption'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(backofficePageProvider.notifier).state =
+                    BackofficePage.tariffActivityReport;
+              },
+              icon: const Icon(Icons.account_balance_wallet_rounded, size: 14),
+              label: const Text('Tariff Activity'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: () {
                 showGeneralDialog(
@@ -172,13 +219,16 @@ class BillingAnalyticalReportsPage extends ConsumerWidget {
                   },
                 );
               },
-              icon: const Icon(Icons.description_rounded, size: 18),
-              label: const Text('Export Intelligence Report'),
+              icon: const Icon(Icons.description_rounded, size: 14),
+              label: const Text('Export Intelligence'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
             ),
@@ -190,19 +240,20 @@ class BillingAnalyticalReportsPage extends ConsumerWidget {
 
   Widget _buildHeaderAction(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF64748B)),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(width: 8),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF94A3B8)),
+          Icon(icon, size: 14, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 11)),
+          const SizedBox(width: 6),
+          const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF94A3B8)),
         ],
       ),
     );
@@ -699,8 +750,17 @@ class _ActiveReportCardState extends ConsumerState<_ActiveReportCard> with Singl
           children: [
             IconButton(
               onPressed: () {
-                ref.read(activeRevenueReportProvider.notifier).state = widget.report;
-                ref.read(backofficePageProvider.notifier).state = BackofficePage.revenueAnalysisReport;
+                final type = widget.report.config.type;
+                if (type == ReportType.revenue) {
+                  ref.read(activeRevenueReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.revenueAnalysisReport;
+                } else if (type == ReportType.consumption) {
+                  ref.read(activeConsumptionReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.consumptionReport;
+                } else if (type == ReportType.tariff) {
+                  ref.read(activeTariffReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.tariffActivityReport;
+                }
               },
               icon: const Icon(Icons.preview_rounded, color: Color(0xFF8B5CF6), size: 20),
               tooltip: 'Review Draft Ledger',
@@ -720,8 +780,17 @@ class _ActiveReportCardState extends ConsumerState<_ActiveReportCard> with Singl
           children: [
             IconButton(
               onPressed: () {
-                ref.read(activeRevenueReportProvider.notifier).state = widget.report;
-                ref.read(backofficePageProvider.notifier).state = BackofficePage.revenueAnalysisReport;
+                final type = widget.report.config.type;
+                if (type == ReportType.revenue) {
+                  ref.read(activeRevenueReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.revenueAnalysisReport;
+                } else if (type == ReportType.consumption) {
+                  ref.read(activeConsumptionReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.consumptionReport;
+                } else if (type == ReportType.tariff) {
+                  ref.read(activeTariffReportProvider.notifier).state = widget.report;
+                  ref.read(backofficePageProvider.notifier).state = BackofficePage.tariffActivityReport;
+                }
               },
               icon: const Icon(Icons.preview_rounded, color: Color(0xFF10B981), size: 20),
               tooltip: 'View Ledger',
