@@ -13,6 +13,7 @@ class BackofficeSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isCollapsed = ref.watch(isSidebarCollapsedProvider);
     final currentPage = ref.watch(backofficePageProvider);
+    final unreadMessages = ref.watch(unreadConversationsProvider).length;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -39,7 +40,15 @@ class BackofficeSidebar extends ConsumerWidget {
                 _buildNavItem(ref, BackofficePage.dataManagement, Icons.storage_rounded, 'Data Management', isCollapsed, currentPage == BackofficePage.dataManagement),
                 _buildNavItem(ref, BackofficePage.investigatorAssignments, Icons.assignment_ind_rounded, 'Assignments', isCollapsed, currentPage == BackofficePage.investigatorAssignments),
                 _buildNavItem(ref, BackofficePage.fieldReports, Icons.description_rounded, 'Field Reports', isCollapsed, currentPage == BackofficePage.fieldReports),
-                _buildNavItem(ref, BackofficePage.notificationsChat, Icons.chat_bubble_rounded, 'Messages', isCollapsed, currentPage == BackofficePage.notificationsChat),
+                _buildNavItem(
+                  ref,
+                  BackofficePage.notificationsChat,
+                  Icons.chat_bubble_rounded,
+                  'Messages',
+                  isCollapsed,
+                  currentPage == BackofficePage.notificationsChat,
+                  badgeCount: unreadMessages,
+                ),
                 _buildNavItem(ref, BackofficePage.mapView, Icons.map_rounded, 'Live Map', isCollapsed, currentPage == BackofficePage.mapView),
                 _buildNavItem(ref, BackofficePage.billingDashboard, Icons.receipt_long_rounded, 'Billing Intelligence', isCollapsed, [
                   BackofficePage.billingDashboard,
@@ -115,7 +124,7 @@ class BackofficeSidebar extends ConsumerWidget {
     );
   }
 
-  Widget _buildNavItem(WidgetRef ref, BackofficePage page, IconData icon, String label, bool isCollapsed, bool isActive) {
+  Widget _buildNavItem(WidgetRef ref, BackofficePage page, IconData icon, String label, bool isCollapsed, bool isActive, {int badgeCount = 0}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
@@ -132,10 +141,28 @@ class BackofficeSidebar extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                 children: [
-                  Icon(
-                    icon,
-                    color: isActive ? AppTheme.secondary : Colors.white.withValues(alpha: 0.5),
-                    size: 22,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        icon,
+                        color: isActive ? AppTheme.secondary : Colors.white.withValues(alpha: 0.5),
+                        size: 22,
+                      ),
+                      if (isCollapsed && badgeCount > 0)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   if (!isCollapsed) ...[
                     const SizedBox(width: 16),
@@ -149,6 +176,22 @@ class BackofficeSidebar extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    if (badgeCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDE047),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '$badgeCount',
+                          style: const TextStyle(
+                            color: Color(0xFF854D0E),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               ),

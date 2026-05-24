@@ -1,8 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/backoffice_providers.dart';
 import '../../../../core/providers.dart';
+import '../../domain/communication_state.dart';
 
 class NotificationsChatPage extends ConsumerStatefulWidget {
   const NotificationsChatPage({super.key});
@@ -14,6 +17,7 @@ class NotificationsChatPage extends ConsumerStatefulWidget {
 
 class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   final TextEditingController _messageController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void dispose() {
@@ -47,22 +51,34 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(selectedChatIndexProvider);
     final unread = ref.watch(unreadConversationsProvider);
+    final callState = ref.watch(activeCallStateProvider);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: [
-        // Left Column: Conversations
-        _buildConversationsColumn(selectedIndex, unread),
-        // Right Column: Chat Thread
-        Expanded(
-          child: _buildChatThread(selectedIndex),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left Column: Conversations
+            _buildConversationsColumn(selectedIndex, unread),
+            // Right Column: Chat Thread
+            Expanded(
+              child: _buildChatThread(selectedIndex),
+            ),
+          ],
         ),
+        if (callState.status != CallStatus.idle)
+          _buildCallOverlay(callState),
       ],
     );
   }
 
   Widget _buildConversationsColumn(int selectedIndex, Set<int> unread) {
     final conversations = _getMockConversations();
+    final filteredConversations = conversations.where((chat) {
+      final name = (chat['name'] as String).toLowerCase();
+      return name.contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return Container(
       width: 400,
       decoration: const BoxDecoration(
@@ -93,14 +109,19 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.search_rounded,
+                      const Icon(Icons.search_rounded,
                           color: Color(0xFF94A3B8), size: 20),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
-                          decoration: InputDecoration(
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val;
+                            });
+                          },
+                          decoration: const InputDecoration(
                             hintText: 'Search investigators...',
                             hintStyle:
                                 TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
@@ -149,10 +170,12 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           Expanded(
             child: ListView.builder(
               padding: EdgeInsets.zero,
-              itemCount: conversations.length,
+              itemCount: filteredConversations.length,
               itemBuilder: (context, index) {
+                final chat = filteredConversations[index];
+                final originalIndex = chat['originalIndex'] as int;
                 return _buildConversationCard(
-                    conversations[index], index == selectedIndex, index, unread.contains(index));
+                    chat, originalIndex == selectedIndex, originalIndex, unread.contains(originalIndex));
               },
             ),
           ),
@@ -301,8 +324,6 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
     final chat = _getMockConversations()[selectedIndex];
     final extraMessages =
         ref.watch(chatMessagesProvider)[selectedIndex] ?? [];
-    final user = ref.watch(userProvider);
-    final senderName = user?.displayName ?? 'You';
 
     return Column(
       children: [
@@ -389,16 +410,31 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
             ),
           ),
           IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.videocam_rounded,
-                  color: Color(0xFF334155))),
+            onPressed: () {
+              ref.read(activeCallStateProvider.notifier).startCall(
+                    name: chat['name'] as String,
+                    avatar: chat['avatar'] as String,
+                    type: CallType.video,
+                  );
+            },
+            icon: const Icon(Icons.videocam_rounded, color: Color(0xFF334155)),
+            tooltip: 'Video Call',
+          ),
           IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.phone_rounded, color: Color(0xFF334155))),
+            onPressed: () {
+              ref.read(activeCallStateProvider.notifier).startCall(
+                    name: chat['name'] as String,
+                    avatar: chat['avatar'] as String,
+                    type: CallType.audio,
+                  );
+            },
+            icon: const Icon(Icons.phone_rounded, color: Color(0xFF334155)),
+            tooltip: 'Voice Call',
+          ),
           IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.more_vert_rounded,
-                  color: Color(0xFF334155))),
+            onPressed: () {},
+            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF334155)),
+          ),
         ],
       ),
     );
@@ -651,7 +687,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   }
 
   List<Map<String, dynamic>> _getMockConversations() {
-    return [
+    final raw = [
       {
         'name': 'Sarah Jenkins',
         'avatar':
@@ -689,5 +725,510 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
         'isPriority': false,
       },
     ];
+
+    for (int i = 0; i < raw.length; i++) {
+      raw[i]['originalIndex'] = i;
+    }
+    return raw;
   }
+
+  // ─── Calling Overlays ────────────────────────────────────────────────────────
+
+  Widget _buildCallOverlay(CallState callState) {
+    if (callState.type == CallType.audio) {
+      return _buildAudioCallOverlay(callState);
+    } else {
+      return _buildVideoCallOverlay(callState);
+    }
+  }
+
+  Widget _buildAudioCallOverlay(CallState callState) {
+    final minutes = (callState.durationSeconds / 60).floor().toString().padLeft(2, '0');
+    final seconds = (callState.durationSeconds % 60).toString().padLeft(2, '0');
+    final timeStr = callState.status == CallStatus.connected ? '$minutes:$seconds' : 'RINGING...';
+
+    return Positioned.fill(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.95),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              PulsatingAvatar(avatarUrl: callState.contactAvatar ?? ''),
+              const SizedBox(height: 48),
+              Text(
+                callState.contactName ?? 'Senior Investigator',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                timeStr,
+                style: TextStyle(
+                  color: callState.status == CallStatus.connected ? AppTheme.secondary : const Color(0xFF94A3B8),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 80),
+              // Call action bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildRoundCallButton(
+                    icon: callState.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    label: 'Mute',
+                    isActive: callState.isMuted,
+                    onTap: () => ref.read(activeCallStateProvider.notifier).toggleMute(),
+                  ),
+                  const SizedBox(width: 32),
+                  _buildRoundCallButton(
+                    icon: Icons.call_end_rounded,
+                    label: 'End',
+                    bgColor: const Color(0xFFEF4444),
+                    iconColor: Colors.white,
+                    onTap: () => ref.read(activeCallStateProvider.notifier).endCall(),
+                  ),
+                  const SizedBox(width: 32),
+                  _buildRoundCallButton(
+                    icon: callState.isSpeakerOn ? Icons.volume_up_rounded : Icons.volume_down_rounded,
+                    label: 'Speaker',
+                    isActive: callState.isSpeakerOn,
+                    onTap: () => ref.read(activeCallStateProvider.notifier).toggleSpeaker(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoCallOverlay(CallState callState) {
+    final minutes = (callState.durationSeconds / 60).floor().toString().padLeft(2, '0');
+    final seconds = (callState.durationSeconds % 60).toString().padLeft(2, '0');
+    final timeStr = callState.status == CallStatus.connected ? '$minutes:$seconds' : 'CONNECTING...';
+
+    return Positioned.fill(
+      child: Container(
+        color: const Color(0xFF0F172A),
+        child: Stack(
+          children: [
+            // Tech-mesh Background
+            const Positioned.fill(
+              child: VideoCallGridBackground(),
+            ),
+            // Simulated HUD Overlay
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'FEED: SECURE_LINK_${(callState.contactName ?? '').replaceAll(' ', '_').toUpperCase()}',
+                              style: const TextStyle(
+                                color: Color(0xFF38BDF8),
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'CRYPTO: AES_256_GCM | LATENCY: 34ms',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'LIVE RECORD',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    // Info panel
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              callState.contactName ?? 'Investigator',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              timeStr,
+                              style: const TextStyle(
+                                color: Color(0xFF38BDF8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Glassmorphic control bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              color: Colors.white.withValues(alpha: 0.05),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildGlassCallButton(
+                                    icon: callState.isCameraOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+                                    isActive: !callState.isCameraOff,
+                                    onTap: () => ref.read(activeCallStateProvider.notifier).toggleCamera(),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildGlassCallButton(
+                                    icon: callState.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                                    isActive: !callState.isMuted,
+                                    onTap: () => ref.read(activeCallStateProvider.notifier).toggleMute(),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildGlassCallButton(
+                                    icon: Icons.call_end_rounded,
+                                    bgColor: const Color(0xFFEF4444),
+                                    iconColor: Colors.white,
+                                    onTap: () => ref.read(activeCallStateProvider.notifier).endCall(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // PIP Local Preview Thumbnail
+            Positioned(
+              top: 100,
+              right: 40,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: 150,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.8),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1.5),
+                  ),
+                  child: callState.isCameraOff
+                      ? const Center(
+                          child: Icon(Icons.videocam_off_rounded, color: Color(0xFF64748B), size: 28),
+                        )
+                      : Stack(
+                          children: [
+                            // Mock self camera feed (blueprint)
+                            Positioned.fill(
+                              child: Opacity(
+                                opacity: 0.3,
+                                child: Container(
+                                  color: const Color(0xFF1E293B),
+                                  child: const Center(
+                                    child: Icon(Icons.person, size: 80, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 12,
+                              left: 12,
+                              child: Text(
+                                'Local Cam'.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoundCallButton({
+    required IconData icon,
+    required String label,
+    Color? bgColor,
+    Color? iconColor,
+    bool isActive = false,
+    required VoidCallback onTap,
+  }) {
+    final bg = bgColor ?? (isActive ? Colors.white : Colors.white.withValues(alpha: 0.1));
+    final fg = iconColor ?? (isActive ? const Color(0xFF0F172A) : Colors.white);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: fg, size: 28),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlassCallButton({
+    required IconData icon,
+    Color? bgColor,
+    Color? iconColor,
+    bool isActive = false,
+    required VoidCallback onTap,
+  }) {
+    final bg = bgColor ?? (isActive ? Colors.white : Colors.white.withValues(alpha: 0.15));
+    final fg = iconColor ?? (isActive ? const Color(0xFF0F172A) : Colors.white);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: bg,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: fg, size: 24),
+      ),
+    );
+  }
+}
+
+// ─── Pulsating Avatar widget ─────────────────────────────────────────────────
+
+class PulsatingAvatar extends StatefulWidget {
+  final String avatarUrl;
+  const PulsatingAvatar({super.key, required this.avatarUrl});
+
+  @override
+  State<PulsatingAvatar> createState() => _PulsatingAvatarState();
+}
+
+class _PulsatingAvatarState extends State<PulsatingAvatar> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            for (int i = 3; i >= 1; i--)
+              Container(
+                width: 120 + (_controller.value * i * 50),
+                height: 120 + (_controller.value * i * 50),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05 * (4 - i)),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                image: DecorationImage(
+                  image: NetworkImage(widget.avatarUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ─── Video Call Grid Background ──────────────────────────────────────────────
+
+class VideoCallGridBackground extends StatefulWidget {
+  const VideoCallGridBackground({super.key});
+
+  @override
+  State<VideoCallGridBackground> createState() => _VideoCallGridBackgroundState();
+}
+
+class _VideoCallGridBackgroundState extends State<VideoCallGridBackground> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            // Dark Blueprint Background
+            Container(color: const Color(0xFF090D16)),
+            // Grid Lines Overlay
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _GridPainter(),
+              ),
+            ),
+            // Scanner Sweep line
+            Positioned(
+              top: MediaQuery.of(context).size.height * _controller.value,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF0284C7).withValues(alpha: 0.7),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..strokeWidth = 1.0;
+
+    const step = 44.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
