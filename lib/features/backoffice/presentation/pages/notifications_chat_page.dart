@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -17,11 +19,14 @@ class NotificationsChatPage extends ConsumerStatefulWidget {
 
 class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _searchExpanded = false;
 
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -71,12 +76,13 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       ],
     );
   }
-
   Widget _buildConversationsColumn(int selectedIndex, Set<int> unread) {
     final conversations = _getMockConversations();
     final filteredConversations = conversations.where((chat) {
       final name = (chat['name'] as String).toLowerCase();
-      return name.contains(_searchQuery.toLowerCase());
+      final staffId = (chat['staffId'] as String? ?? '').toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return name.contains(query) || staffId.contains(query);
     }).toList();
 
     return Container(
@@ -93,44 +99,104 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Notifications &\nCommunication',
-                  style: TextStyle(
-                      color: Color(0xFF1E293B),
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search_rounded,
-                          color: Color(0xFF94A3B8), size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val;
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            hintText: 'Search investigators...',
-                            hintStyle:
-                                TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                            border: InputBorder.none,
-                          ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Notifications &\nCommunication',
+                        style: TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            height: 1.2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TapRegion(
+                      onTapOutside: (event) {
+                        if (_searchExpanded && _searchController.text.isEmpty) {
+                          setState(() => _searchExpanded = false);
+                        }
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.fastOutSlowIn,
+                        width: _searchExpanded ? 200 : 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: _searchExpanded ? Colors.white : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(21),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1E3A8A).withValues(alpha: _searchExpanded ? 0.12 : 0.05),
+                              blurRadius: _searchExpanded ? 16 : 6,
+                              offset: const Offset(0, 3),
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 2),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(21),
+                                onTap: () {
+                                  setState(() {
+                                    if (!_searchExpanded) {
+                                      _searchExpanded = true;
+                                    } else if (_searchController.text.isEmpty) {
+                                      _searchExpanded = false;
+                                      _searchQuery = '';
+                                    }
+                                  });
+                                },
+                                child: SizedBox(
+                                  width: 38,
+                                  height: 38,
+                                  child: Icon(
+                                    Icons.search_rounded, 
+                                    size: 18, 
+                                    color: _searchExpanded ? const Color(0xFF1E3A8A) : const Color(0xFF64748B)
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_searchExpanded)
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    autofocus: true,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Search by ID or name...',
+                                      hintStyle: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w400),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      filled: false,
+                                    ),
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _searchQuery = val;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -359,12 +425,22 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
               // Live sent messages
               for (final msg in extraMessages) ...[
                 const SizedBox(height: 24),
-                _buildChatBubble(
-                  msg['text'] as String,
-                  msg['isOutbound'] as bool,
-                  msg['time'] as String,
-                  '',
-                ),
+                if (msg['type'] == 'voice_note')
+                  _VoiceNoteBubble(msg: msg, isOutbound: msg['isOutbound'] as bool)
+                else if (msg['type'] == 'document' || msg['type'] == 'audio' || msg['type'] == 'video')
+                  _buildFileAttachment(
+                    msg['filename'] as String,
+                    msg['fileSize'] as String,
+                    msg['status'] as String,
+                    type: msg['type'] as String,
+                  )
+                else
+                  _buildChatBubble(
+                    msg['text'] as String? ?? '',
+                    msg['isOutbound'] as bool,
+                    msg['time'] as String,
+                    '',
+                  ),
               ],
             ],
           ),
@@ -580,7 +656,19 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   }
 
   Widget _buildFileAttachment(
-      String filename, String size, String status) {
+      String filename, String size, String status, {String type = 'document'}) {
+    IconData iconData = Icons.description_rounded;
+    Color iconBgColor = Colors.white.withValues(alpha: 0.1);
+    Color cardBgColor = const Color(0xFF0F172A);
+
+    if (type == 'audio') {
+      iconData = Icons.audiotrack_rounded;
+      iconBgColor = const Color(0xFFF59E0B).withValues(alpha: 0.2);
+    } else if (type == 'video') {
+      iconData = Icons.video_library_rounded;
+      iconBgColor = const Color(0xFF10B981).withValues(alpha: 0.2);
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -588,7 +676,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           width: 280,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -597,10 +685,10 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: iconBgColor,
                     borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.description_rounded,
-                    color: Colors.white, size: 24),
+                child: Icon(iconData,
+                    color: type == 'document' ? Colors.white : (type == 'audio' ? const Color(0xFFF59E0B) : const Color(0xFF10B981)), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -611,11 +699,12 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 13)),
+                            fontSize: 13),
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                     Text('$size • $status',
                         style: const TextStyle(
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF94A3B8),
                             fontSize: 11,
                             fontWeight: FontWeight.bold)),
                   ],
@@ -629,7 +718,154 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
     );
   }
 
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+
+  void _startRecording() {
+    setState(() {
+      _isRecording = true;
+      _recordSeconds = 0;
+    });
+    _recordTimer?.cancel();
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _recordSeconds++;
+      });
+    });
+  }
+
+  void _cancelRecording() {
+    _recordTimer?.cancel();
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
+  }
+
+  void _sendVoiceNote(int conversationIndex) {
+    _recordTimer?.cancel();
+    final mins = (_recordSeconds / 60).floor().toString();
+    final secs = (_recordSeconds % 60).toString().padLeft(2, '0');
+    final durationStr = '$mins:$secs';
+
+    final now = TimeOfDay.now();
+    final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
+
+    ref.read(chatMessagesProvider.notifier).update((state) {
+      final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
+      existing.add({
+        'type': 'voice_note',
+        'isOutbound': true,
+        'time': timeStr,
+        'audioDuration': durationStr,
+      });
+      return {...state, conversationIndex: existing};
+    });
+
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
+  }
+
+  void _simulateUpload(int conversationIndex, String fileType) {
+    String filename = 'Document_Report.pdf';
+    String fileSize = '1.4 MB';
+    if (fileType == 'audio') {
+      filename = 'Audio_Log.mp3';
+      fileSize = '3.2 MB';
+    } else if (fileType == 'video') {
+      filename = 'Video_Capture.mp4';
+      fileSize = '12.4 MB';
+    }
+
+    final now = TimeOfDay.now();
+    final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
+
+    ref.read(chatMessagesProvider.notifier).update((state) {
+      final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
+      existing.add({
+        'type': fileType,
+        'isOutbound': true,
+        'time': timeStr,
+        'filename': filename,
+        'fileSize': fileSize,
+        'status': 'Uploading...',
+      });
+      return {...state, conversationIndex: existing};
+    });
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      ref.read(chatMessagesProvider.notifier).update((state) {
+        final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
+        final idx = existing.indexWhere((m) => m['filename'] == filename && m['status'] == 'Uploading...');
+        if (idx != -1) {
+          existing[idx] = Map<String, dynamic>.from(existing[idx])..['status'] = 'Delivered';
+        }
+        return {...state, conversationIndex: existing};
+      });
+    });
+  }
+
   Widget _buildMessageInput(String name, int conversationIndex) {
+    if (_isRecording) {
+      final mins = (_recordSeconds / 60).floor().toString();
+      final secs = (_recordSeconds % 60).toString().padLeft(2, '0');
+      final timeStr = '$mins:$secs';
+
+      return Container(
+        padding: const EdgeInsets.all(40),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1.5)),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: 64,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: const Color(0xFFFCA5A5), width: 1),
+          ),
+          child: Row(
+            children: [
+              const _PulsatingRedDot(),
+              const SizedBox(width: 12),
+              Text(
+                'RECORDING VOICE NOTE  •  $timeStr',
+                style: const TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(child: _AnimatedRecordWaveform()),
+              IconButton(
+                onPressed: _cancelRecording,
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                tooltip: 'Cancel',
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _sendVoiceNote(conversationIndex),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444), shape: BoxShape.circle),
+                  child: const Icon(Icons.check_rounded,
+                      color: Colors.white, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: const BoxDecoration(
@@ -646,10 +882,45 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
         ),
         child: Row(
           children: [
-            IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.add_circle_outline_rounded,
-                    color: Color(0xFF64748B))),
+            PopupMenuButton<String>(
+              offset: const Offset(0, -160),
+              icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF64748B)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              tooltip: 'Attach File',
+              onSelected: (val) => _simulateUpload(conversationIndex, val),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'document',
+                  child: Row(
+                    children: [
+                      Icon(Icons.description_rounded, color: Color(0xFF1E3A8A), size: 18),
+                      SizedBox(width: 12),
+                      Text('Upload Document', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'audio',
+                  child: Row(
+                    children: [
+                      Icon(Icons.audiotrack_rounded, color: Color(0xFFF59E0B), size: 18),
+                      SizedBox(width: 12),
+                      Text('Upload Audio File', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'video',
+                  child: Row(
+                    children: [
+                      Icon(Icons.video_library_rounded, color: Color(0xFF10B981), size: 18),
+                      SizedBox(width: 12),
+                      Text('Upload Video File', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             Expanded(
               child: TextField(
                 controller: _messageController,
@@ -663,6 +934,11 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                   border: InputBorder.none,
                 ),
               ),
+            ),
+            IconButton(
+              onPressed: _startRecording,
+              icon: const Icon(Icons.mic_none_rounded, color: Color(0xFF64748B)),
+              tooltip: 'Record Voice Note',
             ),
             IconButton(
                 onPressed: () {},
@@ -685,11 +961,11 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       ),
     );
   }
-
   List<Map<String, dynamic>> _getMockConversations() {
     final raw = [
       {
         'name': 'Sarah Jenkins',
+        'staffId': 'SU-204',
         'avatar':
             'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100',
         'statusColor': const Color(0xFFFDE047),
@@ -699,6 +975,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       },
       {
         'name': 'Marcus Chen',
+        'staffId': 'SU-115',
         'avatar':
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100',
         'statusColor': const Color(0xFF94A3B8),
@@ -708,6 +985,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       },
       {
         'name': 'Elena Rodriguez',
+        'staffId': 'SU-308',
         'avatar':
             'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100',
         'statusColor': const Color(0xFF22C55E),
@@ -717,6 +995,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       },
       {
         'name': 'David Smith',
+        'staffId': 'SU-092',
         'avatar':
             'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100',
         'statusColor': const Color(0xFF22C55E),
@@ -1232,3 +1511,258 @@ class _GridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+// ─── Voice Note player bubble ────────────────────────────────────────────────
+
+class _VoiceNoteBubble extends StatefulWidget {
+  final Map<String, dynamic> msg;
+  final bool isOutbound;
+  const _VoiceNoteBubble({required this.msg, required this.isOutbound});
+
+  @override
+  State<_VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
+}
+
+class _VoiceNoteBubbleState extends State<_VoiceNoteBubble> with SingleTickerProviderStateMixin {
+  bool _isPlaying = false;
+  double _progress = 0.0;
+  Timer? _timer;
+  late int _totalSeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    final durationStr = widget.msg['audioDuration'] as String? ?? '0:05';
+    final parts = durationStr.split(':');
+    _totalSeconds = (int.tryParse(parts.first) ?? 0) * 60 + (int.tryParse(parts.last) ?? 5);
+    if (_totalSeconds == 0) _totalSeconds = 5;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (_isPlaying) {
+      _timer?.cancel();
+      setState(() {
+        _isPlaying = false;
+      });
+    } else {
+      setState(() {
+        _isPlaying = true;
+      });
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        setState(() {
+          _progress += 0.1 / _totalSeconds;
+          if (_progress >= 1.0) {
+            _progress = 0.0;
+            _isPlaying = false;
+            _timer?.cancel();
+          }
+        });
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbleColor = widget.isOutbound ? const Color(0xFF1E3A8A) : const Color(0xFFF1F5F9);
+    final textColor = widget.isOutbound ? Colors.white : const Color(0xFF334155);
+    final iconColor = widget.isOutbound ? const Color(0xFF1E3A8A) : Colors.white;
+    final btnBgColor = widget.isOutbound ? Colors.white : const Color(0xFF1E3A8A);
+
+    return Row(
+      mainAxisAlignment: widget.isOutbound ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: [
+        if (!widget.isOutbound) ...[
+          const SizedBox(width: 48), // Align with avatar spacing
+        ],
+        Container(
+          width: 280,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: bubbleColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(20),
+              topRight: const Radius.circular(20),
+              bottomLeft: Radius.circular(widget.isOutbound ? 20 : 4),
+              bottomRight: Radius.circular(widget.isOutbound ? 4 : 20),
+            ),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _togglePlay,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: btnBgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: iconColor,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(15, (index) {
+                        final double fraction = index / 15;
+                        final isActive = fraction <= _progress;
+                        final height = 4.0 + ((index % 3 == 0 ? 16.0 : (index % 3 == 1 ? 8.0 : 12.0)));
+                        return Container(
+                          width: 3,
+                          height: height,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? (widget.isOutbound ? const Color(0xFFFDE047) : const Color(0xFF1E3A8A))
+                                : (widget.isOutbound ? Colors.white.withOpacity(0.3) : const Color(0xFFCBD5E1)),
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'VOICE NOTE',
+                          style: TextStyle(
+                            color: widget.isOutbound ? Colors.white.withOpacity(0.6) : const Color(0xFF94A3B8),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        Text(
+                          widget.msg['audioDuration'] as String? ?? '0:05',
+                          style: TextStyle(
+                            color: widget.isOutbound ? Colors.white : const Color(0xFF64748B),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (widget.isOutbound) ...[
+          const SizedBox(width: 48),
+        ]
+      ],
+    );
+  }
+}
+
+// ─── Pulsating Red Dot ───────────────────────────────────────────────────────
+
+class _PulsatingRedDot extends StatefulWidget {
+  const _PulsatingRedDot();
+
+  @override
+  State<_PulsatingRedDot> createState() => _PulsatingRedDotState();
+}
+
+class _PulsatingRedDotState extends State<_PulsatingRedDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+// ─── Animated Record Waveform ────────────────────────────────────────────────
+
+class _AnimatedRecordWaveform extends StatefulWidget {
+  const _AnimatedRecordWaveform();
+
+  @override
+  State<_AnimatedRecordWaveform> createState() => _AnimatedRecordWaveformState();
+}
+
+class _AnimatedRecordWaveformState extends State<_AnimatedRecordWaveform> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(12, (index) {
+            final double phase = (index / 12) * 2 * 3.14159;
+            final double sinVal = (1.0 + math.sin(phase + (_controller.value * 2 * 3.14159))) / 2.0;
+            final double height = 4.0 + (sinVal * 16.0);
+            return Container(
+              width: 3,
+              height: height,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.7),
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+
+

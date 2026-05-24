@@ -159,22 +159,112 @@ List<Map<String, String>> _filterAccounts(List<BillingAccount> accounts, ActiveR
 }
 
 final revenueRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
-  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final dataSource = ref.watch(reportDataSourceProvider);
   final activeReport = ref.watch(activeRevenueReportProvider);
-  return _filterAccounts(accounts, activeReport);
+
+  if (dataSource == ReportDataSource.infrastructure) {
+    final meters = ref.watch(backofficeMetersProvider).valueOrNull ?? [];
+    return _filterMeters(meters, activeReport);
+  } else {
+    final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+    return _filterAccounts(accounts, activeReport);
+  }
 });
 
 final consumptionRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
-  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final dataSource = ref.watch(reportDataSourceProvider);
   final activeReport = ref.watch(activeConsumptionReportProvider);
-  return _filterAccounts(accounts, activeReport);
+
+  if (dataSource == ReportDataSource.infrastructure) {
+    final meters = ref.watch(backofficeMetersProvider).valueOrNull ?? [];
+    return _filterMeters(meters, activeReport);
+  } else {
+    final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+    return _filterAccounts(accounts, activeReport);
+  }
 });
 
 final tariffRawRowsProvider = Provider<List<Map<String, String>>>((ref) {
-  final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+  final dataSource = ref.watch(reportDataSourceProvider);
   final activeReport = ref.watch(activeTariffReportProvider);
-  return _filterAccounts(accounts, activeReport);
+
+  if (dataSource == ReportDataSource.infrastructure) {
+    final meters = ref.watch(backofficeMetersProvider).valueOrNull ?? [];
+    return _filterMeters(meters, activeReport);
+  } else {
+    final accounts = ref.watch(billingAccountsProvider).valueOrNull ?? [];
+    return _filterAccounts(accounts, activeReport);
+  }
 });
+
+List<Map<String, String>> _filterMeters(List<Meter> meters, ActiveReport? activeReport) {
+  List<Meter> filteredMeters = meters;
+
+  if (activeReport != null) {
+    // 1. Date filter
+    filteredMeters = filteredMeters.where((m) {
+      final date = m.installationDate;
+      return date.isAfter(activeReport.config.startDate.subtract(const Duration(seconds: 1))) &&
+             date.isBefore(activeReport.config.endDate.add(const Duration(seconds: 1)));
+    }).toList();
+
+    // 2. Segment filter
+    if (activeReport.config.segments.isNotEmpty) {
+      filteredMeters = filteredMeters.where((m) {
+        return activeReport.config.segments.contains(m.tariffActivity);
+      }).toList();
+    }
+
+    // 3. Status filter
+    if (activeReport.config.statuses.isNotEmpty) {
+      filteredMeters = filteredMeters.where((m) {
+        return activeReport.config.statuses.contains(m.status);
+      }).toList();
+    }
+
+    // 4. Consumption range filter
+    if (activeReport.config.minKwh != null || activeReport.config.maxKwh != null) {
+      filteredMeters = filteredMeters.where((m) {
+        final kwh = (m.debtAmount ?? 0.0) / 1.5;
+        if (activeReport.config.minKwh != null && kwh < activeReport.config.minKwh!) return false;
+        if (activeReport.config.maxKwh != null && kwh > activeReport.config.maxKwh!) return false;
+        return true;
+      }).toList();
+    }
+
+    // 5. Fraud Type filter
+    if (activeReport.config.fraudTypes.isNotEmpty) {
+      filteredMeters = filteredMeters.where((m) {
+        final offense = m.offenseType ?? 'None';
+        return activeReport.config.fraudTypes.contains(offense);
+      }).toList();
+    }
+  }
+
+  final df = DateFormat('dd/MM/yyyy HH:mm');
+  return filteredMeters.map<Map<String, String>>((m) {
+    String statusStr = 'Pending';
+    if (m.status == MeterStatus.paid) statusStr = 'Settled';
+    if (m.status == MeterStatus.billed) statusStr = 'Invoiced';
+    if (m.status == MeterStatus.scheduled) statusStr = 'Scheduled';
+
+    final consumptionVal = ((m.debtAmount ?? 0.0) / 1.5).toStringAsFixed(1);
+
+    return <String, String>{
+      'METER NUMBER': m.id,
+      'ACCOUNT NUMBER': m.spnNumber.isNotEmpty ? m.spnNumber : 'ACC-${m.id}',
+      'TOTAL AMOUNT': (m.debtAmount ?? 0.0).toStringAsFixed(2),
+      'AMOUNT PAID': (m.paidAmount ?? 0.0).toStringAsFixed(2),
+      'FRAUD BILL STATUS': statusStr,
+      'FRAUD STATUS': m.offenseType ?? 'None',
+      'TARIFF': m.tariffClass,
+      'CUSTOMER NAME': m.customerName,
+      'DATE': df.format(m.installationDate),
+      'CONSUMPTION': consumptionVal,
+    };
+  }).toList();
+}
+
 
 /// Parses a date string trying multiple common formats. Returns null if none
 /// of the formats match, so callers can decide whether to include the record.

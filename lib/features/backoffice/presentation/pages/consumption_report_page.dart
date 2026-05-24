@@ -396,6 +396,11 @@ class _Header extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final dataSource = ref.watch(reportDataSourceProvider);
+    final isInfrastructure = dataSource == ReportDataSource.infrastructure;
+    final parentPage = isInfrastructure ? BackofficePage.dataManagement : BackofficePage.analyticalReports;
+    final parentTitle = isInfrastructure ? 'Infrastructure Hub' : 'Analytical Reports';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,13 +410,12 @@ class _Header extends ConsumerWidget {
           children: [
             Row(children: [
               GestureDetector(
-                onTap: () => ref.read(backofficePageProvider.notifier).state =
-                    BackofficePage.analyticalReports,
-                child: const Row(children: [
-                  Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF64748B)),
-                  SizedBox(width: 6),
-                  Text('Analytical Reports',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                onTap: () => ref.read(backofficePageProvider.notifier).state = parentPage,
+                child: Row(children: [
+                  const Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 6),
+                  Text(parentTitle,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
                 ]),
               ),
               const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),

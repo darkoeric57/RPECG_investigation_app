@@ -28,6 +28,10 @@ enum BackofficePage {
   tariffActivityReport,
 }
 
+enum ReportDataSource { billing, infrastructure }
+
+final reportDataSourceProvider = StateProvider<ReportDataSource>((ref) => ReportDataSource.billing);
+
 final backofficePageProvider =
     StateProvider<BackofficePage>((ref) => BackofficePage.dashboard);
 

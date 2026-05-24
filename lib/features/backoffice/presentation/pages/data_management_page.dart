@@ -138,6 +138,8 @@ class DataManagementPage extends ConsumerWidget {
         const SizedBox(width: 16),
         _buildAddDataButton(context, ref),
         const Spacer(),
+        const _InfrastructureSearchBar(),
+        const SizedBox(width: 16),
         // Export CSV
         GestureDetector(
           onTap: () {
@@ -160,7 +162,6 @@ class DataManagementPage extends ConsumerWidget {
           },
           child: _buildActionSecondary(Icons.upload_outlined, 'Export Data'),
         ),
-        const SizedBox(width: 16),
         const SizedBox(width: 16),
         // Refresh Sync (Animated)
         const RefreshSyncButton(),
@@ -944,7 +945,13 @@ class DataManagementPage extends ConsumerWidget {
         const SizedBox(width: 32),
         Expanded(
           flex: 1,
-          child: _buildSecurityCard(),
+          child: Column(
+            children: [
+              _buildSecurityCard(),
+              const SizedBox(height: 24),
+              _buildReportsHubCard(context, ref),
+            ],
+          ),
         ),
       ],
     );
@@ -1085,3 +1092,219 @@ extension StringExtension on String {
     return this[0].toUpperCase() + substring(1).toLowerCase();
   }
 }
+
+// ─── Infrastructure Animated Search Bar ──────────────────────────────────────
+
+class _InfrastructureSearchBar extends StatefulWidget {
+  const _InfrastructureSearchBar();
+
+  @override
+  State<_InfrastructureSearchBar> createState() => _InfrastructureSearchBarState();
+}
+
+class _InfrastructureSearchBarState extends State<_InfrastructureSearchBar> {
+  bool _expanded = false;
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        return TapRegion(
+          onTapOutside: (event) {
+            if (_expanded && _controller.text.isEmpty) {
+              setState(() => _expanded = false);
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.fastOutSlowIn,
+            width: _expanded ? 300 : 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _expanded ? Colors.white : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withValues(alpha: _expanded ? 0.12 : 0.05),
+                  blurRadius: _expanded ? 16 : 6,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 2),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () {
+                      setState(() {
+                        if (!_expanded) {
+                          _expanded = true;
+                        } else if (_controller.text.isEmpty) {
+                          _expanded = false;
+                          ref.read(meterSearchQueryProvider.notifier).state = '';
+                        }
+                      });
+                    },
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(
+                        Icons.search_rounded, 
+                        size: 20, 
+                        color: _expanded ? AppTheme.primary : const Color(0xFF64748B)
+                      ),
+                    ),
+                  ),
+                ),
+                if (_expanded)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: TextField(
+                        controller: _controller,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: 'Search Utility Nodes...',
+                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w400),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          filled: false,
+                        ),
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                        onChanged: (val) {
+                          ref.read(meterSearchQueryProvider.notifier).state = val;
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Reports Query Hub Widget ───────────────────────────────────────────────
+
+extension _ReportsHub on DataManagementPage {
+  Widget _buildReportsHubCard(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.analytics_rounded, color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Reports Query Hub',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Query billing validation, consumption trends, and tariff activity logs compiled directly from active physical infrastructure nodes.',
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 24),
+          _buildHubButton(
+            context,
+            ref,
+            label: 'Revenue Analysis Report',
+            icon: Icons.receipt_long_rounded,
+            color: const Color(0xFF1E3A8A),
+            page: BackofficePage.revenueAnalysisReport,
+          ),
+          const SizedBox(height: 12),
+          _buildHubButton(
+            context,
+            ref,
+            label: 'Consumption Analysis',
+            icon: Icons.bolt_rounded,
+            color: const Color(0xFFD97706),
+            page: BackofficePage.consumptionReport,
+          ),
+          const SizedBox(height: 12),
+          _buildHubButton(
+            context,
+            ref,
+            label: 'Tariff Performance Index',
+            icon: Icons.account_tree_rounded,
+            color: const Color(0xFF7C3AED),
+            page: BackofficePage.tariffActivityReport,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHubButton(
+    BuildContext context,
+    WidgetRef ref, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required BackofficePage page,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: () {
+          ref.read(reportDataSourceProvider.notifier).state = ReportDataSource.infrastructure;
+          ref.read(backofficePageProvider.notifier).state = page;
+        },
+        icon: Icon(icon, size: 16, color: color),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          backgroundColor: color.withValues(alpha: 0.08),
+          foregroundColor: color,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: color.withValues(alpha: 0.15)),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+      ),
+    );
+  }
+}
+

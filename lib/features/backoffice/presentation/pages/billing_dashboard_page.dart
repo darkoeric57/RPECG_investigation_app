@@ -23,7 +23,6 @@ import '../widgets/report_schedule_dialog.dart';
 // ---------------------------------------------------------------------------
 // State providers
 // ---------------------------------------------------------------------------
-final _reportFrequencyProvider = StateProvider<String>((ref) => 'Weekly');
 final _isImportingProvider = StateProvider<bool>((ref) => false);
 final _importProgressProvider = StateProvider<String>((ref) => '');
 
@@ -529,9 +528,6 @@ class _ReportSchedulerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final freq = ref.watch(_reportFrequencyProvider);
-    final options = ['Weekly', 'Monthly', 'Custom'];
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -550,36 +546,6 @@ class _ReportSchedulerCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const Text('FREQUENCY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.5)),
-          const SizedBox(height: 8),
-          Row(
-            children: options.map((o) {
-              final isSelected = freq == o;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: o != options.last ? 8 : 0),
-                  child: GestureDetector(
-                    onTap: () => ref.read(_reportFrequencyProvider.notifier).state = o,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF1E3A8A) : const Color(0xFFF3F3F5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(o,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : Colors.grey[600])),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
           const Text('NEXT RUN DATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.5)),
           const SizedBox(height: 8),
           Container(
