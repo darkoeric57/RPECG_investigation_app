@@ -4,10 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/backoffice_providers.dart';
 import '../../../../core/providers.dart';
 import '../../domain/communication_state.dart';
+import '../../providers/chat_provider.dart';
+import '../../../../core/services/firebase_data_service.dart';
 
 class NotificationsChatPage extends ConsumerStatefulWidget {
   const NotificationsChatPage({super.key});
@@ -23,38 +26,159 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   String _searchQuery = '';
   bool _searchExpanded = false;
 
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentUser = ref.read(userProvider);
+      if (currentUser != null) {
+        FirestoreDataService().seedMockUsers(currentUser.uid);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
     _searchController.dispose();
+    _recordTimer?.cancel();
     super.dispose();
   }
 
-  void _sendMessage(int conversationIndex) {
+  void _sendMessage(String chatId) {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    final now = TimeOfDay.now();
-    final timeStr =
-        '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
-
-    ref.read(chatMessagesProvider.notifier).update((state) {
-      final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
-      existing.add({'text': text, 'isOutbound': true, 'time': timeStr});
-      return {...state, conversationIndex: existing};
-    });
-
-    // Mark conversation as read
-    ref.read(unreadConversationsProvider.notifier).update(
-          (s) => s.difference({conversationIndex}),
-        );
-
+    final currentUser = ref.read(userProvider);
+    if (currentUser != null) {
+      FirestoreDataService().saveMessage(
+        chatId: chatId,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName ?? 'Manager',
+        text: text,
+        type: 'text',
+      );
+    }
     _messageController.clear();
+  }
+
+  void _sendVoiceNote(String chatId) {
+    _recordTimer?.cancel();
+    final mins = (_recordSeconds / 60).floor().toString();
+    final secs = (_recordSeconds % 60).toString().padLeft(2, '0');
+    final durationStr = '$mins:$secs';
+
+    final currentUser = ref.read(userProvider);
+    if (currentUser != null) {
+      FirestoreDataService().saveMessage(
+        chatId: chatId,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName ?? 'Manager',
+        text: 'Voice note ($durationStr)',
+        type: 'voice_note',
+        filename: 'Voice_Note.m4a',
+        fileSize: '${(_recordSeconds * 12.5).toStringAsFixed(1)} KB',
+        status: 'Delivered',
+        voiceDuration: _recordSeconds,
+      );
+    }
+
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
+  }
+
+  void _simulateUpload(String chatId, String fileType) {
+    String filename = 'Document_Report.pdf';
+    String fileSize = '1.4 MB';
+    if (fileType == 'audio') {
+      filename = 'Audio_Log.mp3';
+      fileSize = '3.2 MB';
+    } else if (fileType == 'video') {
+      filename = 'Video_Capture.mp4';
+      fileSize = '12.4 MB';
+    }
+
+    final currentUser = ref.read(userProvider);
+    if (currentUser == null) return;
+
+    FirestoreDataService().saveMessage(
+      chatId: chatId,
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName ?? 'Manager',
+      text: 'Sent a $fileType: $filename',
+      type: fileType,
+      filename: filename,
+      fileSize: fileSize,
+      status: 'Uploading...',
+    );
+
+    Future.delayed(const Duration(milliseconds: 1500), () async {
+      try {
+        final messages = await FirebaseFirestore.instance
+            .collection('Chats')
+            .doc(chatId)
+            .collection('Messages')
+            .where('filename', isEqualTo: filename)
+            .where('status', isEqualTo: 'Uploading...')
+            .get();
+        for (var doc in messages.docs) {
+          await doc.reference.update({'status': 'Delivered'});
+        }
+      } catch (e) {
+        print('DEBUG: Error updating upload status: $e');
+      }
+    });
+  }
+
+  void _startRecording() {
+    setState(() {
+      _isRecording = true;
+      _recordSeconds = 0;
+    });
+    _recordTimer?.cancel();
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _recordSeconds++;
+      });
+    });
+  }
+
+  void _cancelRecording() {
+    _recordTimer?.cancel();
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
+  }
+
+  String _formatTimestamp(dynamic timestamp) {
+    if (timestamp == null) return '';
+    DateTime date;
+    if (timestamp is Timestamp) {
+      date = timestamp.toDate();
+    } else if (timestamp is int) {
+      date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    } else if (timestamp is String) {
+      date = DateTime.tryParse(timestamp) ?? DateTime.now();
+    } else {
+      return '';
+    }
+    
+    final now = DateTime.now();
+    if (date.day == now.day && date.month == now.month && date.year == now.year) {
+      return DateFormat('hh:mm a').format(date);
+    }
+    return DateFormat('dd/MM/yy').format(date);
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = ref.watch(selectedChatIndexProvider);
     final unread = ref.watch(unreadConversationsProvider);
     final callState = ref.watch(activeCallStateProvider);
 
@@ -64,10 +188,10 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Left Column: Conversations
-            _buildConversationsColumn(selectedIndex, unread),
+            _buildConversationsColumn(unread),
             // Right Column: Chat Thread
             Expanded(
-              child: _buildChatThread(selectedIndex),
+              child: _buildChatThread(),
             ),
           ],
         ),
@@ -76,14 +200,11 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       ],
     );
   }
-  Widget _buildConversationsColumn(int selectedIndex, Set<int> unread) {
-    final conversations = _getMockConversations();
-    final filteredConversations = conversations.where((chat) {
-      final name = (chat['name'] as String).toLowerCase();
-      final staffId = (chat['staffId'] as String? ?? '').toLowerCase();
-      final query = _searchQuery.toLowerCase();
-      return name.contains(query) || staffId.contains(query);
-    }).toList();
+
+  Widget _buildConversationsColumn(Set<int> unread) {
+    final usersAsync = ref.watch(chatUsersStreamProvider);
+    final currentUser = ref.watch(userProvider);
+    final currentUid = currentUser?.uid ?? '';
 
     return Container(
       width: 400,
@@ -234,14 +355,38 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: filteredConversations.length,
-              itemBuilder: (context, index) {
-                final chat = filteredConversations[index];
-                final originalIndex = chat['originalIndex'] as int;
-                return _buildConversationCard(
-                    chat, originalIndex == selectedIndex, originalIndex, unread.contains(originalIndex));
+            child: usersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Error loading contacts', style: TextStyle(color: Colors.red[800], fontSize: 13))),
+              data: (allUsers) {
+                final contacts = allUsers.where((u) => u['uid'] != currentUid).toList();
+                final filtered = contacts.where((chat) {
+                  final name = (chat['name'] as String? ?? '').toLowerCase();
+                  final staffId = (chat['staffId'] as String? ?? '').toLowerCase();
+                  final query = _searchQuery.toLowerCase();
+                  return name.contains(query) || staffId.contains(query);
+                }).toList();
+
+                if (filtered.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 32),
+                      child: Text('No users match query.',
+                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final chat = filtered[index];
+                    final activeUser = ref.watch(activeChatUserProvider);
+                    final isSelected = activeUser != null && activeUser['uid'] == chat['uid'];
+                    return _buildConversationCard(chat, isSelected, index);
+                  },
+                );
               },
             ),
           ),
@@ -251,28 +396,27 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   }
 
   Widget _buildConversationCard(
-      Map<String, dynamic> chat, bool isSelected, int index, bool isUnread) {
+      Map<String, dynamic> chat, bool isSelected, int index) {
+    final avatar = chat['photoUrl'] as String? ?? 
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';
+    final statusColor = chat['statusColor'] as Color? ?? const Color(0xFF22C55E);
+    final lastMessage = chat['lastMessage'] as String? ?? 'Click to start chatting';
+    final timeStr = _formatTimestamp(chat['lastMessageTime']);
+
     return GestureDetector(
       onTap: () {
-        ref.read(selectedChatIndexProvider.notifier).state = index;
-        // Mark as read
-        ref.read(unreadConversationsProvider.notifier).update(
-              (s) => s.difference({index}),
-            );
+        ref.read(activeChatUserProvider.notifier).state = chat;
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFF8FAFC) : Colors.transparent,
-          border: isSelected
-              ? const Border(
-                  left: BorderSide(color: Color(0xFF1E3A8A), width: 4))
-              : null,
+          border: const Border(
+              bottom: BorderSide(color: Color(0xFFF8FAFC), width: 1)),
         ),
         child: Row(
           children: [
-            _buildAvatar(chat['avatar'] as String,
-                chat['statusColor'] as Color),
+            _buildAvatar(avatar, statusColor),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -282,71 +426,48 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        chat['name'] as String,
+                        chat['name'] as String? ?? 'User',
                         style: const TextStyle(
                             color: Color(0xFF1E293B),
                             fontWeight: FontWeight.w800,
                             fontSize: 15),
                       ),
-                      Row(
-                        children: [
-                          if (isUnread)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              margin: const EdgeInsets.only(right: 6),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF1E3A8A),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          Text(
-                            chat['time'] as String,
-                            style: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10),
-                          ),
-                        ],
+                      Text(
+                        timeStr,
+                        style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    chat['lastMessage'] as String,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: isSelected
-                            ? const Color(0xFF334155)
-                            : const Color(0xFF64748B),
-                        fontSize: 13,
-                        fontWeight:
-                            isUnread ? FontWeight.w700 : FontWeight.w500),
-                  ),
-                  if (chat['isPriority'] as bool) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFB91C1C),
-                          borderRadius: BorderRadius.circular(4)),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.priority_high_rounded,
-                              color: Colors.white, size: 10),
-                          SizedBox(width: 4),
-                          Text('HIGH PRIORITY',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 10)),
-                        ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFF64748B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        chat['staffId'] as String? ?? '',
+                        style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -386,71 +507,106 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
     );
   }
 
-  Widget _buildChatThread(int selectedIndex) {
-    final chat = _getMockConversations()[selectedIndex];
-    final extraMessages =
-        ref.watch(chatMessagesProvider)[selectedIndex] ?? [];
+  Widget _buildChatThread() {
+    final targetUser = ref.watch(activeChatUserProvider);
+    if (targetUser == null) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.forum_outlined, size: 64, color: Color(0xFFE2E8F0)),
+            SizedBox(height: 24),
+            Text('No Conversation Selected',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('Select a team member from the list to start chatting in real-time.',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    final chatId = ref.watch(activeChatIdProvider) ?? '';
+    final messagesAsync = ref.watch(chatMessagesStreamProvider(chatId));
 
     return Column(
       children: [
-        _buildChatHeader(chat),
+        _buildChatHeader(targetUser),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(40),
-            children: [
-              _buildDateSeparator('TODAY'),
-              const SizedBox(height: 32),
-              if (chat['isPriority'] as bool) _buildSystemAlert(),
-              const SizedBox(height: 32),
-              _buildChatBubble(
-                  'I\'ve received the alert. I\'m currently on-site but I don\'t have the updated Facility B schematics on my tablet. They were supposed to be pushed in the last sync.',
-                  false,
-                  '10:15 AM',
-                  chat['avatar'] as String),
-              const SizedBox(height: 24),
-              _buildChatBubble(
-                  'Can you verify if the schematics in the central repository match the physical layout? I suspect a discrepancy near the ventilation shaft.',
-                  false,
-                  '10:17 AM',
-                  chat['avatar'] as String),
-              const SizedBox(height: 32),
-              _buildChatBubble(
-                  'Copy that, Sarah. I\'m pulling the master schematics for Facility B now. I\'ll initiate a forced sync to your device once I\'ve confirmed the shaft details.',
-                  true,
-                  '10:20 AM',
-                  ''),
-              const SizedBox(height: 12),
-              _buildFileAttachment(
-                  'Facility_B_Final_v4.pdf', '2.4 MB', 'Uploading...'),
-              // Live sent messages
-              for (final msg in extraMessages) ...[
-                const SizedBox(height: 24),
-                if (msg['type'] == 'voice_note')
-                  _VoiceNoteBubble(msg: msg, isOutbound: msg['isOutbound'] as bool)
-                else if (msg['type'] == 'document' || msg['type'] == 'audio' || msg['type'] == 'video')
-                  _buildFileAttachment(
-                    msg['filename'] as String,
-                    msg['fileSize'] as String,
-                    msg['status'] as String,
-                    type: msg['type'] as String,
-                  )
-                else
-                  _buildChatBubble(
-                    msg['text'] as String? ?? '',
-                    msg['isOutbound'] as bool,
-                    msg['time'] as String,
-                    '',
+          child: messagesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Center(child: Text('Error loading messages: $err')),
+            data: (messages) {
+              final currentUser = ref.watch(userProvider);
+              final currentUid = currentUser?.uid ?? '';
+              
+              if (messages.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 16),
+                      Text('No messages yet with ${targetUser['name']}',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                      const SizedBox(height: 8),
+                      const Text('Type your first message below to begin.',
+                          style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+                    ],
                   ),
-              ],
-            ],
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(40),
+                itemCount: messages.length,
+                itemBuilder: (context, idx) {
+                  final msg = messages[idx];
+                  final isOutbound = msg['senderId'] == currentUid;
+                  final timeStr = _formatTimestamp(msg['timestamp']);
+
+                  if (msg['type'] == 'voice_note') {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: _VoiceNoteBubble(msg: msg, isOutbound: isOutbound),
+                    );
+                  } else if (msg['type'] == 'document' || msg['type'] == 'audio' || msg['type'] == 'video') {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: _buildFileAttachment(
+                        msg['filename'] as String? ?? 'file',
+                        msg['fileSize'] as String? ?? '0 KB',
+                        msg['status'] as String? ?? 'Complete',
+                        type: msg['type'] as String,
+                        isOutbound: isOutbound,
+                      ),
+                    );
+                  } else {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: _buildChatBubble(
+                        msg['text'] as String? ?? '',
+                        isOutbound,
+                        timeStr,
+                        isOutbound ? '' : (targetUser['photoUrl'] as String? ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'),
+                      ),
+                    );
+                  }
+                },
+              );
+            },
           ),
         ),
-        _buildMessageInput(chat['name'] as String, selectedIndex),
+        _buildMessageInput(targetUser['name'] as String? ?? 'User', chatId),
       ],
     );
   }
 
   Widget _buildChatHeader(Map<String, dynamic> chat) {
+    final avatar = chat['photoUrl'] as String? ?? 
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';
+    final statusColor = chat['statusColor'] as Color? ?? const Color(0xFF22C55E);
+
     return Container(
       height: 100,
       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -461,23 +617,22 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       ),
       child: Row(
         children: [
-          _buildAvatar(
-              chat['avatar'] as String, chat['statusColor'] as Color),
+          _buildAvatar(avatar, statusColor),
           const SizedBox(width: 20),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(chat['name'] as String,
+                Text(chat['name'] as String? ?? 'User',
                     style: const TextStyle(
                         color: Color(0xFF1E293B),
                         fontWeight: FontWeight.w900,
                         fontSize: 18)),
                 const SizedBox(height: 4),
-                const Text(
-                    'SENIOR FIELD INVESTIGATOR • ACTIVE NOW',
-                    style: TextStyle(
+                Text(
+                    'STAFF ID: ${chat['staffId'] as String? ?? 'N/A'} • ACTIVE NOW',
+                    style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w900,
                         fontSize: 10,
@@ -488,8 +643,8 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           IconButton(
             onPressed: () {
               ref.read(activeCallStateProvider.notifier).startCall(
-                    name: chat['name'] as String,
-                    avatar: chat['avatar'] as String,
+                    name: chat['name'] as String? ?? 'User',
+                    avatar: avatar,
                     type: CallType.video,
                   );
             },
@@ -499,8 +654,8 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           IconButton(
             onPressed: () {
               ref.read(activeCallStateProvider.notifier).startCall(
-                    name: chat['name'] as String,
-                    avatar: chat['avatar'] as String,
+                    name: chat['name'] as String? ?? 'User',
+                    avatar: avatar,
                     type: CallType.audio,
                   );
             },
@@ -510,61 +665,6 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
           IconButton(
             onPressed: () {},
             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF334155)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateSeparator(String label) {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(label,
-              style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 10,
-                  letterSpacing: 1)),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-      ],
-    );
-  }
-
-  Widget _buildSystemAlert() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFEE2E2)),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_rounded, color: Color(0xFFB91C1C), size: 28),
-          SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('HIGH PRIORITY SYSTEM ALERT',
-                    style: TextStyle(
-                        color: Color(0xFF991B1B),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                        letterSpacing: 0.5)),
-                SizedBox(height: 8),
-                Text(
-                  'Security breach detected in Facility B storage unit. Requesting immediate verification of facility schematics from field personnel.',
-                  style: TextStyle(
-                      color: Color(0xFF7F1D1D), fontSize: 14, height: 1.5),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -656,7 +756,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   }
 
   Widget _buildFileAttachment(
-      String filename, String size, String status, {String type = 'document'}) {
+      String filename, String size, String status, {String type = 'document', bool isOutbound = true}) {
     IconData iconData = Icons.description_rounded;
     Color iconBgColor = Colors.white.withValues(alpha: 0.1);
     Color cardBgColor = const Color(0xFF0F172A);
@@ -670,8 +770,11 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
     }
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: isOutbound ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
+        if (!isOutbound) ...[
+          const SizedBox(width: 48),
+        ],
         Container(
           width: 280,
           padding: const EdgeInsets.all(16),
@@ -713,102 +816,14 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
             ],
           ),
         ),
-        const SizedBox(width: 48),
+        if (isOutbound) ...[
+          const SizedBox(width: 48),
+        ],
       ],
     );
   }
 
-  bool _isRecording = false;
-  int _recordSeconds = 0;
-  Timer? _recordTimer;
-
-  void _startRecording() {
-    setState(() {
-      _isRecording = true;
-      _recordSeconds = 0;
-    });
-    _recordTimer?.cancel();
-    _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _recordSeconds++;
-      });
-    });
-  }
-
-  void _cancelRecording() {
-    _recordTimer?.cancel();
-    setState(() {
-      _isRecording = false;
-      _recordSeconds = 0;
-    });
-  }
-
-  void _sendVoiceNote(int conversationIndex) {
-    _recordTimer?.cancel();
-    final mins = (_recordSeconds / 60).floor().toString();
-    final secs = (_recordSeconds % 60).toString().padLeft(2, '0');
-    final durationStr = '$mins:$secs';
-
-    final now = TimeOfDay.now();
-    final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
-
-    ref.read(chatMessagesProvider.notifier).update((state) {
-      final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
-      existing.add({
-        'type': 'voice_note',
-        'isOutbound': true,
-        'time': timeStr,
-        'audioDuration': durationStr,
-      });
-      return {...state, conversationIndex: existing};
-    });
-
-    setState(() {
-      _isRecording = false;
-      _recordSeconds = 0;
-    });
-  }
-
-  void _simulateUpload(int conversationIndex, String fileType) {
-    String filename = 'Document_Report.pdf';
-    String fileSize = '1.4 MB';
-    if (fileType == 'audio') {
-      filename = 'Audio_Log.mp3';
-      fileSize = '3.2 MB';
-    } else if (fileType == 'video') {
-      filename = 'Video_Capture.mp4';
-      fileSize = '12.4 MB';
-    }
-
-    final now = TimeOfDay.now();
-    final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.period.name.toUpperCase()}';
-
-    ref.read(chatMessagesProvider.notifier).update((state) {
-      final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
-      existing.add({
-        'type': fileType,
-        'isOutbound': true,
-        'time': timeStr,
-        'filename': filename,
-        'fileSize': fileSize,
-        'status': 'Uploading...',
-      });
-      return {...state, conversationIndex: existing};
-    });
-
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      ref.read(chatMessagesProvider.notifier).update((state) {
-        final existing = List<Map<String, dynamic>>.from(state[conversationIndex] ?? []);
-        final idx = existing.indexWhere((m) => m['filename'] == filename && m['status'] == 'Uploading...');
-        if (idx != -1) {
-          existing[idx] = Map<String, dynamic>.from(existing[idx])..['status'] = 'Delivered';
-        }
-        return {...state, conversationIndex: existing};
-      });
-    });
-  }
-
-  Widget _buildMessageInput(String name, int conversationIndex) {
+  Widget _buildMessageInput(String name, String chatId) {
     if (_isRecording) {
       final mins = (_recordSeconds / 60).floor().toString();
       final secs = (_recordSeconds % 60).toString().padLeft(2, '0');
@@ -850,7 +865,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => _sendVoiceNote(conversationIndex),
+                onTap: () => _sendVoiceNote(chatId),
                 child: Container(
                   width: 44,
                   height: 44,
@@ -887,13 +902,13 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
               icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF64748B)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               tooltip: 'Attach File',
-              onSelected: (val) => _simulateUpload(conversationIndex, val),
+              onSelected: (val) => _simulateUpload(chatId, val),
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: 'document',
                   child: Row(
                     children: [
-                      Icon(Icons.description_rounded, color: Color(0xFF1E3A8A), size: 18),
+                      Icon(Icons.description_rounded, color: Color(0xFF4F46E5), size: 18),
                       SizedBox(width: 12),
                       Text('Upload Document', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
@@ -924,7 +939,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
             Expanded(
               child: TextField(
                 controller: _messageController,
-                onSubmitted: (_) => _sendMessage(conversationIndex),
+                onSubmitted: (_) => _sendMessage(chatId),
                 decoration: InputDecoration(
                   hintText: 'Type your response to $name...',
                   hintStyle: const TextStyle(
@@ -946,7 +961,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                     color: Color(0xFF64748B))),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: () => _sendMessage(conversationIndex),
+              onTap: () => _sendMessage(chatId),
               child: Container(
                 width: 44,
                 height: 44,
@@ -961,57 +976,6 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
       ),
     );
   }
-  List<Map<String, dynamic>> _getMockConversations() {
-    final raw = [
-      {
-        'name': 'Sarah Jenkins',
-        'staffId': 'SU-204',
-        'avatar':
-            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100',
-        'statusColor': const Color(0xFFFDE047),
-        'lastMessage': 'Critical: Facility B Schematics',
-        'time': 'JUST NOW',
-        'isPriority': true,
-      },
-      {
-        'name': 'Marcus Chen',
-        'staffId': 'SU-115',
-        'avatar':
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100',
-        'statusColor': const Color(0xFF94A3B8),
-        'lastMessage': 'Grid calibration complete for S...',
-        'time': '14:02 PM',
-        'isPriority': false,
-      },
-      {
-        'name': 'Elena Rodriguez',
-        'staffId': 'SU-308',
-        'avatar':
-            'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100',
-        'statusColor': const Color(0xFF22C55E),
-        'lastMessage': 'Requesting access to vault logs.',
-        'time': '09:45 AM',
-        'isPriority': false,
-      },
-      {
-        'name': 'David Smith',
-        'staffId': 'SU-092',
-        'avatar':
-            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100',
-        'statusColor': const Color(0xFF22C55E),
-        'lastMessage': 'The equipment has been disp...',
-        'time': 'Yesterday',
-        'isPriority': false,
-      },
-    ];
-
-    for (int i = 0; i < raw.length; i++) {
-      raw[i]['originalIndex'] = i;
-    }
-    return raw;
-  }
-
-  // ─── Calling Overlays ────────────────────────────────────────────────────────
 
   Widget _buildCallOverlay(CallState callState) {
     if (callState.type == CallType.audio) {

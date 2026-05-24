@@ -165,4 +165,129 @@ class FirestoreDataService {
       return [];
     }
   }
+
+  // ─── Real-Time Chat ──────────────────────────────────────────────────────────
+
+  Stream<List<Map<String, dynamic>>> getUsersStream() {
+    return _db.collection('Users').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['uid'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> getMessagesStream(String chatId) {
+    return _db
+        .collection('Chats')
+        .doc(chatId)
+        .collection('Messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  Future<void> saveMessage({
+    required String chatId,
+    required String senderId,
+    required String senderName,
+    required String text,
+    String type = 'text',
+    String? filename,
+    String? fileSize,
+    String? status,
+    int? voiceDuration,
+    Map<String, dynamic>? extraData,
+  }) async {
+    try {
+      final messageData = {
+        'senderId': senderId,
+        'senderName': senderName,
+        'text': text,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': type,
+        if (filename != null) 'filename': filename,
+        if (fileSize != null) 'fileSize': fileSize,
+        if (status != null) 'status': status,
+        if (voiceDuration != null) 'voiceDuration': voiceDuration,
+        if (extraData != null) ...extraData,
+      };
+
+      final members = chatId.split('_');
+
+      final chatData = {
+        'members': members,
+        'lastMessage': type == 'text' ? text : '[$type]',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      };
+
+      final batch = _db.batch();
+      final chatRef = _db.collection('Chats').doc(chatId);
+      final messageRef = chatRef.collection('Messages').doc();
+
+      batch.set(chatRef, chatData, SetOptions(merge: true));
+      batch.set(messageRef, messageData);
+      await batch.commit();
+    } catch (e) {
+      print('DEBUG: Firestore error saving message: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> seedMockUsers(String currentUserUid) async {
+    try {
+      final querySnapshot = await _db.collection('Users').get();
+      if (querySnapshot.docs.length <= 1) {
+        final batch = _db.batch();
+        final mockUsers = [
+          {
+            'name': 'Sarah Jenkins',
+            'staffId': 'SU-204',
+            'email': 'sarah@gmail.com',
+            'region': 'Eastern',
+            'accountType': 'Technical',
+            'createdAt': FieldValue.serverTimestamp(),
+            'photoUrl': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100',
+          },
+          {
+            'name': 'Marcus Chen',
+            'staffId': 'SU-115',
+            'email': 'marcus@gmail.com',
+            'region': 'Northern',
+            'accountType': 'Admin',
+            'createdAt': FieldValue.serverTimestamp(),
+            'photoUrl': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100',
+          },
+          {
+            'name': 'Elena Rodriguez',
+            'staffId': 'SU-308',
+            'email': 'elena@gmail.com',
+            'region': 'Greater Accra',
+            'accountType': 'Technical',
+            'createdAt': FieldValue.serverTimestamp(),
+            'photoUrl': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100',
+          },
+        ];
+
+        for (var u in mockUsers) {
+          final deterministicId = 'mock_${u['staffId']}';
+          final docRef = _db.collection('Users').doc(deterministicId);
+          batch.set(docRef, u);
+        }
+
+        await batch.commit();
+        print('DEBUG: Successfully seeded mock users in Firestore.');
+      }
+    } catch (e) {
+      print('DEBUG: Firestore error seeding mock users: $e');
+    }
+  }
 }
+
