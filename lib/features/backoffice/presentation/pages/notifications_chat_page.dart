@@ -397,8 +397,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
 
   Widget _buildConversationCard(
       Map<String, dynamic> chat, bool isSelected, int index) {
-    final avatar = chat['photoUrl'] as String? ?? 
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';
+    final avatar = _getAvatarUrl(chat);
     final statusColor = chat['statusColor'] as Color? ?? const Color(0xFF22C55E);
     final lastMessage = chat['lastMessage'] as String? ?? 'Click to start chatting';
     final timeStr = _formatTimestamp(chat['lastMessageTime']);
@@ -475,6 +474,25 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
         ),
       ),
     );
+  }
+
+  String _getAvatarUrl(Map<String, dynamic> user) {
+    final photoUrl = user['photoUrl'] as String?;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return photoUrl;
+    }
+    final gender = (user['gender'] as String? ?? '').toLowerCase();
+    if (gender == 'female') {
+      return 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=150';
+    } else if (gender == 'male') {
+      return 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150';
+    }
+    // Fallback heuristic: check name for typical female names
+    final name = (user['name'] as String? ?? '').toLowerCase();
+    if (name.contains('sarah') || name.contains('elena') || name.contains('mary') || name.contains('jane') || name.contains('female')) {
+      return 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=150';
+    }
+    return 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150';
   }
 
   Widget _buildAvatar(String url, Color statusColor) {
@@ -588,7 +606,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
                         msg['text'] as String? ?? '',
                         isOutbound,
                         timeStr,
-                        isOutbound ? '' : (targetUser['photoUrl'] as String? ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'),
+                        isOutbound ? '' : _getAvatarUrl(targetUser),
                       ),
                     );
                   }
@@ -603,8 +621,7 @@ class _NotificationsChatPageState extends ConsumerState<NotificationsChatPage> {
   }
 
   Widget _buildChatHeader(Map<String, dynamic> chat) {
-    final avatar = chat['photoUrl'] as String? ?? 
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100';
+    final avatar = _getAvatarUrl(chat);
     final statusColor = chat['statusColor'] as Color? ?? const Color(0xFF22C55E);
 
     return Container(

@@ -15,6 +15,7 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   String _selectedRegion = 'Head Office';
+  String _selectedGender = 'Male';
   final String _accountType = 'Technical';
   bool _obscurePassword = true;
   final bool _obscureConfirmPassword = true;
@@ -311,6 +312,98 @@ class _SignupScreenState extends State<SignupScreen> {
           ],
         ),
         const SizedBox(height: 24),
+
+        _buildInputLabel('Gender'),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() => _selectedGender = 'Male'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: _selectedGender == 'Male'
+                        ? AppTheme.primary.withValues(alpha: 0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _selectedGender == 'Male'
+                          ? AppTheme.primary
+                          : const Color(0xFFE2E8F0),
+                      width: _selectedGender == 'Male' ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.male,
+                        color: _selectedGender == 'Male'
+                            ? AppTheme.primary
+                            : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Male',
+                        style: TextStyle(
+                          color: _selectedGender == 'Male'
+                              ? AppTheme.primary
+                              : const Color(0xFF1E293B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() => _selectedGender = 'Female'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: _selectedGender == 'Female'
+                        ? AppTheme.primary.withValues(alpha: 0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _selectedGender == 'Female'
+                          ? AppTheme.primary
+                          : const Color(0xFFE2E8F0),
+                      width: _selectedGender == 'Female' ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.female,
+                        color: _selectedGender == 'Female'
+                            ? AppTheme.primary
+                            : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Female',
+                        style: TextStyle(
+                          color: _selectedGender == 'Female'
+                              ? AppTheme.primary
+                              : const Color(0xFF1E293B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
         
         _buildInputLabel('Email Address'),
         CustomTextField(
@@ -430,6 +523,7 @@ Widget _buildInputLabel(String label) {
         accountType: _accountType,
         groupNo: _groupNoController.text.trim(),
         phone: _phoneController.text.trim(),
+        gender: _selectedGender,
       );
 
       if (mounted) {

@@ -21,6 +21,7 @@ class FirebaseAuthService {
     required String accountType,
     String? groupNo,
     String? phone,
+    String? gender,
   }) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
@@ -38,6 +39,7 @@ class FirebaseAuthService {
           'accountType': accountType,
           'groupNo': groupNo,
           'phone': phone,
+          'gender': gender ?? 'Male',
           'createdAt': FieldValue.serverTimestamp(),
         });
         
