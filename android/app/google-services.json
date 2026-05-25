@@ -1,0 +1,35 @@
+{
+  "project_info": {
+    "project_number": "242887564068",
+    "firebase_url": "https://easternrp-cd71e.firebaseio.com",
+    "project_id": "easternrp-cd71e",
+    "storage_bucket": "easternrp-cd71e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242887564068:android:fbdf2b8c548b99f368b1b1",
+        "android_client_info": {
+          "package_name": "com.example.files"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "750117713412-b65ek83dp8o4kmc1d4970c1mehk6plnu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBF35MFcYTmIWyU14JwgowDqp1fF_yEFeM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
